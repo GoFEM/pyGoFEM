@@ -3,12 +3,11 @@
     
     Alexander Grayver, 2019
 '''
-
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
+from functools import partial
 
 def plot_2d_triangulation(triangulation, color_scheme = None):
     
@@ -100,3 +99,118 @@ def refine_around_points(triangulation, points, center, radius, repeat = 1, excl
                     cell.refine_flag = 'isotropic'
                     
         triangulation.execute_coarsening_and_refinement()
+        
+def project_points_on_interface(triangulation, points, material_id, mapping):
+    '''
+        Project points to the given material interface. During this
+        procedure, only the vertical coordinate of the points is
+        adjusted. Normally, material id given to this function will
+        correspond to the air or sea, such that points are projected
+        to the ground or seafloor. 
+    '''
+    
+    dim = triangulation.dim()
+    
+    projected_points = []
+    
+    for cell in triangulation.active_cells():
+        face_no = 0
+        for face in cell.faces():            
+            if not face.at_boundary():
+                my_material = cell.material_id
+                neighbor_material = cell.neighbor(face_no).material_id
+                
+                if (my_material != neighbor_material) and\
+                   (my_material != material_id) and\
+                   (neighbor_material == material_id):
+                    
+                    face_v = []
+                    for i in range(2**(dim-1)):
+                        face_v.append(face.get_vertex(i))
+                        
+                    for point in points:
+                        px = point[0];
+                        py = point[1];
+
+                        within = (px >= face_v[0].x) and (px < face_v[1].x)
+                        if dim == 3:
+                            within &= (py >= face_v[0].y) and (py < face_v[2].y)
+
+                        if not within:
+                            continue
+                            
+                        p_cell = cell.center(True)
+                        p_cell.x = px
+                        if dim == 3:
+                            p_cell.y = py
+
+                        point_on_face = mapping.project_real_point_to_unit_point_on_face(cell, face_no, p_cell);
+                        projected_points.append(mapping.transform_unit_to_real_cell (cell, point_on_face).to_list());
+
+            
+            face_no += 1
+            
+    return projected_points
+        
+class Topography:
+    def __init__(self, topography, dim, center, radius, pnorm = 2):
+        self.topography = topography
+        self.center = center
+        self.radius = radius
+        self.pnorm = pnorm
+        self.dim = dim
+        
+    def fit_to(self, triangulation, thickness, inverse = False):
+        
+        self.thickness = thickness
+        
+        if inverse:
+            transformation = partial(self.__pull_back)
+        else:
+            transformation = partial(self.__push_forward)
+            
+        triangulation.transform(transformation)
+        
+        
+    def __pull_back(self, p):
+        
+        z = p[self.dim - 1]
+        p_hat = p
+        
+        dist = 0
+        for d in range(self.dim):
+            dist += abs(self.center[d] - p[d])**self.pnorm / self.radius[d]**self.pnorm
+                
+        h = self.topography(p[:-1])
+                
+        if dist <= 1. and h < 0:
+            if (z - h) < 0: 
+                z_hat = self.thickness[0] * (z - h) / (self.thickness[0] + h) # z is above h
+            else:
+                z_hat = self.thickness[1] * (z - h) / (self.thickness[1] - h) # z is below h
+                
+            p_hat[self.dim - 1] = z_hat
+            
+        return p_hat
+        
+        
+    def __push_forward(self, p_hat):
+        
+        z_hat = p_hat[self.dim - 1]
+        p = p_hat
+        
+        dist = 0
+        for d in range(self.dim):
+            dist += abs(self.center[d] - p[d])**self.pnorm / self.radius[d]**self.pnorm
+        
+        h = self.topography(p_hat[:-1])
+        
+        if dist <= 1. and h < 0:
+            if z_hat < 0: 
+                z = z_hat + (z_hat + self.thickness[0]) / self.thickness[0] * h
+            else:
+                z = z_hat - (z_hat - self.thickness[1]) / self.thickness[1] * h
+                
+            p[self.dim - 1] = z
+            
+        return p
