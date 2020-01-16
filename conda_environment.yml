@@ -1,0 +1,23 @@
+name: gofem
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - cmake
+  - boost
+  - petsc
+  - slepc
+  - gcc_linux-64
+  - gfortran_linux-64
+  - gxx_linux-64
+  - mpich
+  - lapack
+  - blas[build=openblas]
+  - nomkl
+  - hdf5[build=mpi_mpich*]
+  - jupyterlab
+  - matplotlib
+  - numpy
+prefix: /home/agrayver/anaconda3/envs/gofem
+
