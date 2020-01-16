@@ -1,7 +1,31 @@
-# pyGoFEM
+# Motivation
+
 Python front-end for the GoFEM package. 
 
 See jupyter notebooks for examples on how to setup GoFEM with python and process the results.
+
+# Installation
+
+*Note: instructions below should work for most linux/OSX systems. I did not test this on Windows.*
+
+It is easiest to setup the pyGoFEM via conda. First, deploy the environment 
+
+'''
+conda env create -f gofem_environment.yml
+conda activate gofem
+'''
+
+Then, get the latest [deal.II](https://github.com/dealii/dealii/) library. The library needs to be configured with the python bindings:
+
+'''
+mkdir build && cd build
+cmake -DCMAKE_INSTALL_PREFIX=/path/to/install/deal.II -DCMAKE_BUILD_TYPE=Release -DDEAL_II_WITH_THREADS=OFF -DDEAL_II_WITH_UMFPACK=OFF -DDEAL_II_WITH_ZLIB=ON -DDEAL_II_COMPONENT_PYTHON_BINDINGS=ON ../
+make install
+'''
+
+After this, you should be able to run the tutorial notebooks.
+
+# Referencing
 
 When used, please aknowledge GoFEM by citing one or more of the following references
 
