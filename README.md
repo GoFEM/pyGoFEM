@@ -15,11 +15,11 @@ conda env create -f gofem_environment.yml
 conda activate gofem
 ```
 
-Then, get the latest [deal.II](https://github.com/dealii/dealii/) library. The library needs to be configured with the python bindings:
+Then, get the latest [deal.II](https://github.com/dealii/dealii/) library. The library needs to be configured with the python bindings, e.g.:
 
 ```
 mkdir build && cd build
-cmake -DCMAKE_INSTALL_PREFIX=/path/to/install/deal.II -DCMAKE_BUILD_TYPE=Release -DDEAL_II_WITH_THREADS=OFF -DDEAL_II_WITH_UMFPACK=OFF -DDEAL_II_WITH_ZLIB=ON -DDEAL_II_COMPONENT_PYTHON_BINDINGS=ON ../
+cmake -DCMAKE_INSTALL_PREFIX=/path/to/install/deal.II -DCMAKE_BUILD_TYPE=Release -DDEAL_II_WITH_ZLIB=ON -DDEAL_II_COMPONENT_PYTHON_BINDINGS=ON ../
 make install
 ```
 
