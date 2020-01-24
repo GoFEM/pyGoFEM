@@ -33,7 +33,7 @@ def plot_2d_triangulation(triangulation, color_scheme = None):
     p = PatchCollection(patches, edgecolors='k', facecolors=None)
     p.set_array(np.array(colors))
     
-    ax.add_collection(p, autolim=True)
+    ax.add_collection(p)
     ax.autoscale_view()  
     ax.invert_yaxis()
     
@@ -189,16 +189,17 @@ class Topography:
         zt = self.topography(p[:-1])
                 
         if dist <= 1.:
+            z_hat = z
             if zt < 0: # land
                 if (z - zt) < 0: 
                     z_hat = self.z_top_land * (z - zt) / (self.z_top_land + zt) # z is above ground
                 else:
                     z_hat = self.z_bottom * (z - zt) / (self.z_bottom - zt) # z is below ground
             elif zt > 0: # sea
-                if (z >= self.z_top_sea) and (z <= self.z_0_sea):
-                    z_hat = (self.z_top_sea * (self.z_0_sea - zt)) / (self.z_top_sea - zt)
-                elif(z > self.z_0_sea) and (z <= self.z_bottom):
-                    z_hat = (self.z_bottom * (self.z_0_sea - zt)) / (self.z_bottom - zt)
+                if (z >= self.z_top_sea) and (z <= zt):
+                    z_hat = (self.z_0_sea * self.z_top_sea - self.z_0_sea * z + self.z_top_sea * z - self.z_top_sea * zt) / (self.z_top_sea - zt)
+                elif(z > zt) and (z <= self.z_bottom):
+                    z_hat = (self.z_0_sea * self.z_bottom - self.z_0_sea * z + self.z_bottom * z - self.z_bottom * zt) / (self.z_bottom - zt)
             else:
                 z_hat = z
 
@@ -219,20 +220,19 @@ class Topography:
         zt = self.topography(p_hat[:-1])
         
         if dist <= 1.:
+            z = z_hat
             if zt < 0: # land
                 if z_hat < 0: 
-                    z = z_hat + (z_hat + self.z_top_land) / (self.z_top_land - self.z_0_land) * zt
+                    z = z_hat + (z_hat + self.z_top_land) / (self.z_top_land - self.z_0_land) * zt # z is above ground
                 else:
-                    z = z_hat - (z_hat - self.z_bottom) / (self.z_bottom - self.z_0_land) * zt
+                    z = z_hat - (z_hat - self.z_bottom) / (self.z_bottom - self.z_0_land) * zt # z is below ground
             elif zt > 0: # sea
-                if (z >= self.z_top_sea) and (z <= self.z_0_sea):
+                if (z_hat >= self.z_top_sea) and (z_hat <= self.z_0_sea):
                     z = (self.z_0_sea - zt) / (self.z_0_sea - self.z_top_sea) * self.z_top_sea +\
-                    (zt - self.z_top_sea) / (self.z_0_sea - self.z_top_sea) * z_hat
-                elif(z > self.z_0_sea) and (z <= self.z_bottom):
+                        (zt - self.z_top_sea) / (self.z_0_sea - self.z_top_sea) * z_hat
+                elif (z_hat > self.z_0_sea) and (z_hat <= self.z_bottom):
                     z = (self.z_bottom - zt) / (self.z_bottom - self.z_0_sea) * z_hat +\
                         (zt - self.z_0_sea) / (self.z_bottom - self.z_0_sea) * self.z_bottom
-            else:
-                z = z_hat
 
             p[self.dim - 1] = z
             
