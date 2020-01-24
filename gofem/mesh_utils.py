@@ -160,9 +160,14 @@ class Topography:
         self.pnorm = pnorm
         self.dim = dim
         
-    def fit_to(self, triangulation, thickness, inverse = False):
+        self.z_top_sea = 0
+        self.z_0_land = 0
         
-        self.thickness = thickness
+    def fit_to(self, triangulation, z_top, z_bottom, z_mean_bathymetry = 0, inverse = False):
+        
+        self.z_top_land = z_top
+        self.z_bottom = z_bottom
+        self.z_0_sea = z_mean_bathymetry
         
         if inverse:
             transformation = partial(self.__pull_back)
@@ -181,14 +186,22 @@ class Topography:
         for d in range(self.dim):
             dist += abs(self.center[d] - p[d])**self.pnorm / self.radius[d]**self.pnorm
                 
-        h = self.topography(p[:-1])
+        zt = self.topography(p[:-1])
                 
-        if dist <= 1. and h < 0:
-            if (z - h) < 0: 
-                z_hat = self.thickness[0] * (z - h) / (self.thickness[0] + h) # z is above h
+        if dist <= 1.:
+            if zt < 0: # land
+                if (z - zt) < 0: 
+                    z_hat = self.z_top_land * (z - zt) / (self.z_top_land + zt) # z is above ground
+                else:
+                    z_hat = self.z_bottom * (z - zt) / (self.z_bottom - zt) # z is below ground
+            elif zt > 0: # sea
+                if (z >= self.z_top_sea) and (z <= self.z_0_sea):
+                    z_hat = (self.z_top_sea * (self.z_0_sea - zt)) / (self.z_top_sea - zt)
+                elif(z > self.z_0_sea) and (z <= self.z_bottom):
+                    z_hat = (self.z_bottom * (self.z_0_sea - zt)) / (self.z_bottom - zt)
             else:
-                z_hat = self.thickness[1] * (z - h) / (self.thickness[1] - h) # z is below h
-                
+                z_hat = z
+
             p_hat[self.dim - 1] = z_hat
             
         return p_hat
@@ -203,14 +216,24 @@ class Topography:
         for d in range(self.dim):
             dist += abs(self.center[d] - p[d])**self.pnorm / self.radius[d]**self.pnorm
         
-        h = self.topography(p_hat[:-1])
+        zt = self.topography(p_hat[:-1])
         
-        if dist <= 1. and h < 0:
-            if z_hat < 0: 
-                z = z_hat + (z_hat + self.thickness[0]) / self.thickness[0] * h
+        if dist <= 1.:
+            if zt < 0: # land
+                if z_hat < 0: 
+                    z = z_hat + (z_hat + self.z_top_land) / (self.z_top_land - self.z_0_land) * zt
+                else:
+                    z = z_hat - (z_hat - self.z_bottom) / (self.z_bottom - self.z_0_land) * zt
+            elif zt > 0: # sea
+                if (z >= self.z_top_sea) and (z <= self.z_0_sea):
+                    z = (self.z_0_sea - zt) / (self.z_0_sea - self.z_top_sea) * self.z_top_sea +\
+                    (zt - self.z_top_sea) / (self.z_0_sea - self.z_top_sea) * z_hat
+                elif(z > self.z_0_sea) and (z <= self.z_bottom):
+                    z = (self.z_bottom - zt) / (self.z_bottom - self.z_0_sea) * z_hat +\
+                        (zt - self.z_0_sea) / (self.z_bottom - self.z_0_sea) * self.z_bottom
             else:
-                z = z_hat - (z_hat - self.thickness[1]) / self.thickness[1] * h
-                
+                z = z_hat
+
             p[self.dim - 1] = z
             
         return p
