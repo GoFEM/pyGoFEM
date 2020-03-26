@@ -80,14 +80,14 @@ class ParameterHandler:
                                             'Target RMS': 1.,\
                                             'Scaling factor': [1.],\
                                             'Regularization operator': 'Roughness',\
-                                            'Regularization update': 1.,\
+                                            'Regularization update': 1,\
                                             'Use starting model as reference': False,\
                                             'Face weighting': [1.,1.,1.],\
                                             'Non-conforming interface weighting': 1.,\
                                             'Cell weighting': [0.,0.,0.,1.],\
                                             'Model transformation': 'BOUNDED',
                                             'Minimum conductivity': 1e-5,\
-                                            'Maximum conductivity': 1e-2,\
+                                            'Maximum conductivity': 1e2,\
                                             'Number of inner iterations': 20,\
                                             'Inner solver type': 'Krylov',\
                                             'Steplength iterations': 1,\
