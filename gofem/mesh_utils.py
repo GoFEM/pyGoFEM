@@ -1,7 +1,7 @@
 '''
-    Various auxiliary routines to work with the GoFEM models
+    Various auxiliary routines to work with the GoFEM
     
-    Alexander Grayver, 2019
+    Alexander Grayver, 2019 - 2020
 '''
 import numpy as np
 import matplotlib.pyplot as plt
@@ -41,13 +41,42 @@ def plot_2d_triangulation(triangulation, color_scheme = None):
     ax.set_ylabel('z (m)')
         
     return fig, ax
-    
 
-def refine_at_interface(triangulation, material_ids, repeat = 1, center = None, radius = None, pnorm = 2):
+def is_within_ellipsoid(point, center, radii, pnorm = 2):
+    '''
+        Returns true if a point is within an ellipsoid. Ellipsoid is
+        centred at center and with radii along principal axes. 
+        For pnorm = 1 the ellipsoid degenerated into a parallelepiped.
+    '''   
+    
+    assert len(point) == len(center) == len(radii)
+    
+    assert pnorm in [1, 2]
+    
+    dim = len(point)
+    
+    dist = 0
+    within = True
+
+    if(pnorm > 1.):
+        for d in range(dim):
+            dist += (abs(center[d] - point[d]) / radii[d])**pnorm
+        
+        if not dist <= 1.:
+            within = False
+            
+    elif pnorm == 1:        
+        for d in range(dim):
+            within &= abs(center[d] - point[d]) < radii[d]
+
+    return within
+
+
+def refine_at_interface(triangulation, material_ids, repeat = 1, center = None, radii = None, pnorm = 2):
     '''
         Refine cells with provided material ids in triangulation that neighbor cells with
         other ids. Repeat several times if requested. Only cells that are within
-        a given radius are refined.
+        a given radii are refined.
     '''
     
     dim = triangulation.dim()
@@ -57,18 +86,13 @@ def refine_at_interface(triangulation, material_ids, repeat = 1, center = None, 
             if not cell.material_id in material_ids:
                 continue
                 
-            dist = 0
-            if center and radius:
+            if center and radii:
                 p_center = cell.center().to_list()
-                for d in range(dim-1):
-                    dist += abs(center[d] - p_center[d])**pnorm / radius[d]**pnorm
-                    
-            if not dist <= 1.:
-                continue
-                
-            faces = cell.faces()
-            for n in range(len(faces)):
-                if not faces[n].at_boundary():
+                if not is_within_ellipsoid(p_center[:dim-1], center[:dim-1], radii[:dim-1], pnorm):
+                    continue
+
+            for n, face in enumerate(cell.faces()):
+                if not face.at_boundary():
                     neighbor = cell.neighbor(n)
                     if not neighbor.material_id in material_ids:
                         cell.refine_flag = 'isotropic'
@@ -76,10 +100,10 @@ def refine_at_interface(triangulation, material_ids, repeat = 1, center = None, 
         triangulation.execute_coarsening_and_refinement()
         
         
-def refine_around_points(triangulation, points, center, radius, repeat = 1, exclude_materials = [], pnorm = 2):
+def refine_around_points(triangulation, points, center, radii, repeat = 1, exclude_materials = [], pnorm = 2):
     '''
         Refine cells around points Repeat several times if requested. 
-        Only cells that are within a given radius are refined.
+        Only cells that are within a given radii are refined.
     '''
     
     dim = triangulation.dim()
@@ -91,15 +115,56 @@ def refine_around_points(triangulation, points, center, radius, repeat = 1, excl
                 
             center = cell.center().to_list()
             for point in points:
-                dist = 0
-                for d in range(dim):
-                    dist += abs(center[d] - point[d])**pnorm / radius[d]**pnorm
-                
-                if dist <= 1.:
+                if is_within_ellipsoid(point, center, radii, pnorm):
                     cell.refine_flag = 'isotropic'
                     
         triangulation.execute_coarsening_and_refinement()
         
+def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radii, repeat = 1, pnorm = 2):
+    '''
+        
+    '''
+    import shapely.geometry
+    
+    dim = triangulation.dim()
+    
+    assert dim == 3
+    
+    for i in range(repeat):
+        for cell in triangulation.active_cells():
+            if cell.material_id == material_id:
+                continue
+            
+            cell_center = cell.center().to_list()
+            
+            if not is_within_ellipsoid(cell_center[:dim-1], center[:dim-1], radii[:dim-1], pnorm):
+                continue
+                
+            point = shapely.geometry.Point(cell_center[0], cell_center[1])
+            is_cell_inside = polygon.contains(point)
+            
+            faces = cell.faces()
+            top_face = 4
+            if not faces[top_face].at_boundary():
+                top_material_id = cell.neighbor(top_face).material_id
+                if top_material_id != material_id:
+                    continue
+            
+            for n, face in enumerate(faces):
+                if not face.at_boundary():
+                    neighbor = cell.neighbor(n)
+                    
+                    neighbor_center = neighbor.center().to_list()
+                    
+                    point = shapely.geometry.Point(neighbor_center[0], neighbor_center[1])
+                    is_neighbor_inside = polygon.contains(point)
+                    
+                    if is_cell_inside != is_neighbor_inside:
+                        cell.refine_flag = 'isotropic'
+                        
+        triangulation.execute_coarsening_and_refinement()
+            
+            
 def project_points_on_interface(triangulation, points, material_id, mapping):
     '''
         Project points to the given material interface. During this
@@ -153,10 +218,10 @@ def project_points_on_interface(triangulation, points, material_id, mapping):
     return projected_points
         
 class Topography:
-    def __init__(self, topography, dim, center, radius, pnorm = 2):
+    def __init__(self, topography, dim, center, radii, pnorm = 2):
         self.topography = topography
         self.center = center
-        self.radius = radius
+        self.radii = radii
         self.pnorm = pnorm
         self.dim = dim
         
@@ -184,7 +249,7 @@ class Topography:
         
         dist = 0
         for d in range(self.dim):
-            dist += abs(self.center[d] - p[d])**self.pnorm / self.radius[d]**self.pnorm
+            dist += abs(self.center[d] - p[d])**self.pnorm / self.radii[d]**self.pnorm
                 
         zt = self.topography(p[:-1])
                 
@@ -215,7 +280,7 @@ class Topography:
         
         dist = 0
         for d in range(self.dim):
-            dist += abs(self.center[d] - p[d])**self.pnorm / self.radius[d]**self.pnorm
+            dist += abs(self.center[d] - p[d])**self.pnorm / self.radii[d]**self.pnorm
         
         zt = self.topography(p_hat[:-1])
         
