@@ -36,9 +36,8 @@ def read_modeling_output(file_format, frequencies):
         df_num = pd.DataFrame()
         df_num.insert(0, df.columns[0], df[df.columns[0]])
         df_num.insert(1, df.columns[1], df[df.columns[1]])
-        df_num.insert(2, df.columns[2], df[df.columns[2]])
         
-        for col_idx in range(3, len(df.columns)):
+        for col_idx in range(2, len(df.columns)):
             col_str = df[df.columns[col_idx]]
             col_num = np.zeros(shape=(len(col_str),), dtype = np.complex128)
             
