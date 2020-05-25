@@ -60,7 +60,8 @@ class ParameterHandler:
                                     'Inversion materials definition file': '',\
                                     'Background model definition file': '',\
                                     'Background materials definition file': '',\
-                                    'Active domain box': [0,0,0,0,0,0]}
+                                    'Active domain box': [0,0,0,0,0,0],\
+                                    'Active domain mask': ''}
             
         self.parameters['Survey'] = {'Frequencies file': '',\
                                     'Times file': '',\

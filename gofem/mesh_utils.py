@@ -1,5 +1,5 @@
 '''
-    Various auxiliary routines to work with the GoFEM
+    Various auxiliary routines to work with the GoFEM meshes
     
     Alexander Grayver, 2019 - 2020
 '''
