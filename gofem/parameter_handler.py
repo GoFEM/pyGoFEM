@@ -93,7 +93,7 @@ class ParameterHandler:
                                             'Inner solver type': 'Krylov',\
                                             'Steplength iterations': 1,\
                                             'Step lengths file': '',\
-                                            'Output files prefix': 'inv_'}
+                                            'Output files prefix': 'inv'}
         
         
     def getitem(self, section, parameter):

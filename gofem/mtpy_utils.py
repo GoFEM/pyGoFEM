@@ -53,6 +53,9 @@ def write_edi_collection_to_gofem(edi_collection, outfile, error_floor, data_typ
     rho_err_func = lambda z, ze, freq: 2. * abs(z) / (2. * math.pi * freq * mu) * ze;
     phi_err_func = lambda z, ze: 180. / math.pi * ze / abs(z);
     
+    # Convert from [mV/km]/[nT] to Ohm
+    factor = (4 * math.pi) / 10000.0
+    
     for freq in edi_collection.all_frequencies:
         for mt_obj in edi_collection.mt_obj_list:
             freq_max = freq * (1 + ptol)
@@ -73,20 +76,20 @@ def write_edi_collection_to_gofem(edi_collection, outfile, error_floor, data_typ
             tobj = mt_obj.Tipper
             ptobj = mt_obj.pt
             
-            dZxy = max([zobj.z_err[p_index, 0, 1], error_floor * math.sqrt(abs(zobj.z[p_index, 0, 1]))])
-            dZyx = max([zobj.z_err[p_index, 1, 0], error_floor * math.sqrt(abs(zobj.z[p_index, 1, 0]))])
+            dZxy = max([zobj.z_err[p_index, 0, 1], error_floor * abs(zobj.z[p_index, 0, 1])]) * factor
+            dZyx = max([zobj.z_err[p_index, 1, 0], error_floor * abs(zobj.z[p_index, 1, 0])]) * factor
                         
             if data_type == 'Z_offdiag' or data_type == 'Z':
-                mt_data.append([str_codes[0], freq, mt_obj.station, zobj.z[p_index, 0, 1].real, dZxy])
-                mt_data.append([str_codes[1], freq, mt_obj.station, zobj.z[p_index, 0, 1].imag, dZxy])
-                mt_data.append([str_codes[2], freq, mt_obj.station, zobj.z[p_index, 1, 0].real, dZyx])
-                mt_data.append([str_codes[3], freq, mt_obj.station, zobj.z[p_index, 1, 0].imag, dZyx])
+                mt_data.append([str_codes[0], freq, mt_obj.station, zobj.z[p_index, 0, 1].real * factor, dZxy])
+                mt_data.append([str_codes[1], freq, mt_obj.station, zobj.z[p_index, 0, 1].imag * factor, dZxy])
+                mt_data.append([str_codes[2], freq, mt_obj.station, zobj.z[p_index, 1, 0].real * factor, dZyx])
+                mt_data.append([str_codes[3], freq, mt_obj.station, zobj.z[p_index, 1, 0].imag * factor, dZyx])
                                
                 if data_type == 'Z':
-                    mt_data.append([str_codes[4], freq, mt_obj.station, zobj.z[p_index, 0, 0].real, dZxy])
-                    mt_data.append([str_codes[5], freq, mt_obj.station, zobj.z[p_index, 0, 0].imag, dZxy])
-                    mt_data.append([str_codes[6], freq, mt_obj.station, zobj.z[p_index, 1, 1].real, dZyx])
-                    mt_data.append([str_codes[7], freq, mt_obj.station, zobj.z[p_index, 1, 1].imag, dZyx])
+                    mt_data.append([str_codes[4], freq, mt_obj.station, zobj.z[p_index, 0, 0].real * factor, dZxy])
+                    mt_data.append([str_codes[5], freq, mt_obj.station, zobj.z[p_index, 0, 0].imag * factor, dZxy])
+                    mt_data.append([str_codes[6], freq, mt_obj.station, zobj.z[p_index, 1, 1].real * factor, dZyx])
+                    mt_data.append([str_codes[7], freq, mt_obj.station, zobj.z[p_index, 1, 1].imag * factor, dZyx])
                                    
             elif data_type == 'RP_offdiag' or data_type == 'RP':
                 mt_data.append([str_codes[0], freq, mt_obj.station, zobj.resistivity[p_index, 0, 1], zobj.resistivity_err[p_index, 0, 1]])
@@ -132,6 +135,9 @@ def read_gofem_modelling_output(fileformat, frequency_list, station_list, statio
     z_dummy = np.zeros((len(frequency_list), 2, 2), dtype='complex')
     t_dummy = np.zeros((len(frequency_list), 1, 2), dtype='complex')
     
+    # Conversion factor from Ohm to [mV/km]/[nT]
+    factor = 10000.0 / (4 * math.pi)
+    
     data_dict = {}
     for station, xyz in zip(station_list, station_coords):
         data_dict[station] = mt.MT()
@@ -166,11 +172,9 @@ def read_gofem_modelling_output(fileformat, frequency_list, station_list, statio
     mu0 = 4. * np.pi * 1e-7
     for station, mt_obj in data_dict.items():
         
-        mt_obj.Z.resistivity = np.apply_along_axis(lambda x: np.abs(x) ** 2 / (2 * np.pi * mt_obj.Z.freq * mu0),
-                                                    0, mt_obj.Z.z)
+        mt_obj.Z.z *= factor
         
-        mt_obj.Z.phase = np.rad2deg(np.angle(mt_obj.Z.z))
-        
+        mt_obj.Z.compute_resistivity_phase()
         mt_obj.pt.set_z_object(mt_obj.Z)
         mt_obj.Tipper.compute_amp_phase()
         mt_obj.Tipper.compute_mag_direction()
