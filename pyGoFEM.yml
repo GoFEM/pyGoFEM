@@ -1,0 +1,16 @@
+name: gofem
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - mpich
+  - hdf5[build=mpi_mpich*]
+  - netcdf4
+  - jupyterlab
+  - matplotlib
+  - numpy
+  - dealii
+  - cartopy
+  - pandas
+
