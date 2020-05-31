@@ -6,24 +6,16 @@ See jupyter notebooks for examples on how to setup GoFEM with python and process
 
 # Installation
 
-*Note: instructions below should work for most linux/OSX systems. I did not test this on Windows.*
+**Note**: instructions below should work for linux and OSX systems. On Windows, you can use [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl).
 
-It is easiest to setup the pyGoFEM via [conda](https://docs.conda.io/en/latest/). First, deploy the environment 
-
-```
-conda env create -f gofem_environment.yml
-conda activate gofem
-```
-
-Then, get the latest deal.II library (version 9.2 or newer). The library needs to be configured with the python bindings, e.g.:
+It is easiest to setup the pyGoFEM via [conda](https://docs.conda.io/en/latest/). Just deploy the environment using the environment file *pyGoFEM.yml* as:
 
 ```
-mkdir build && cd build
-cmake -DCMAKE_INSTALL_PREFIX=/path/to/install/deal.II -DDEAL_II_COMPONENT_PYTHON_BINDINGS=ON -DCMAKE_BUILD_TYPE=Release -DDEAL_II_WITH_ZLIB=ON ../
-make install
+conda env create -f pyGoFEM.yml
+conda activate pygofem
 ```
 
-After this, you should be able to run the tutorial notebooks.
+That is it! You should now be able to run the tutorial notebooks.
 
 # Referencing
 
