@@ -125,10 +125,10 @@ def write_edi_collection_to_gofem(edi_collection, outfile, error_floor, data_typ
 
 def read_gofem_modelling_output(fileformat, frequency_list, station_list, station_coords):
     '''
-        Read in GoFEM and return a list of MT object list
+        Read in GoFEM modelling output and return a list of MTpy objects
     '''
         
-    dfs = read_modeling_output(fileformat, frequency_list)
+    dfs = read_modeling_responses(fileformat, frequency_list)
     
     assert len(dfs) == len(frequency_list)
     
@@ -181,4 +181,89 @@ def read_gofem_modelling_output(fileformat, frequency_list, station_list, statio
         
         mt_obj_list.append(mt_obj)
     
+    return mt_obj_list
+
+def read_gofem_inversion_output(data_file):
+    '''
+        Read in GoFEM inversion data file and return a list of MTpy objects
+    '''
+    
+    colnames = ['type', 'frequency', 'source', 'station', 'value', 'std_error']
+    df = pd.read_csv(data_file, sep="\t+", header=None, names=colnames)
+
+    all_frequencies = df['frequency'].unique()
+    stations = df['station'].unique()
+
+    z_dummy = np.zeros((len(all_frequencies), 2, 2), dtype='complex')
+    t_dummy = np.zeros((len(all_frequencies), 1, 2), dtype='complex')
+
+    ptol = 0.03
+
+    # Conversion factor from Ohm to [mV/km]/[nT]
+    factor = 10000.0 / (4 * math.pi)
+
+    mt_obj_list = []
+    for station in stations:
+        dfs = df[df['station'] == station]
+    
+        mt_obj = mt.MT()
+        mt_obj.Z = mtz.Z(z_array=z_dummy.copy(),
+                         z_err_array=z_dummy.copy().real,
+                         freq=np.array(all_frequencies))
+        mt_obj.Tipper = mtz.Tipper(tipper_array=t_dummy.copy(),
+                                   tipper_err_array=t_dummy.copy().real,
+                                   freq=np.array(all_frequencies))
+        
+        mt_obj.station = station
+    
+        for n, frequency in enumerate(all_frequencies):
+            freq_max = frequency * (1 + ptol)
+            freq_min = frequency * (1 - ptol)
+        
+            dfs_freq = dfs[(dfs['frequency'] < freq_max) & (dfs['frequency'] > freq_min)]
+        
+            if(dfs_freq.size == 0):
+                continue;
+            
+            dfs_freq.set_index('type',inplace=True)
+        
+            if 'RealZxx' in dfs_freq.index and 'ImagZxx' in dfs_freq.index:
+                Zxx = complex(dfs_freq.loc['RealZxx'].value, 
+                              dfs_freq.loc['ImagZxx'].value)
+                mt_obj.Z.z[n, 0, 0] = Zxx
+            
+            if 'RealZxy' in dfs_freq.index and 'ImagZxy' in dfs_freq.index:
+                Zxy = complex(dfs_freq.loc['RealZxy'].value, 
+                              dfs_freq.loc['ImagZxy'].value)
+                mt_obj.Z.z[n, 0, 1] = Zxy
+            
+            if 'RealZyx' in dfs_freq.index and 'ImagZyx' in dfs_freq.index:
+                Zyx = complex(dfs_freq.loc['RealZyx'].value, 
+                              dfs_freq.loc['ImagZyx'].value)
+                mt_obj.Z.z[n, 1, 0] = Zyx
+            
+            if 'RealZyy' in dfs_freq.index and 'ImagZyy' in dfs_freq.index:
+                Zyy = complex(dfs_freq.loc['RealZyy'].value, 
+                              dfs_freq.loc['ImagZyy'].value)
+                mt_obj.Z.z[n, 1, 1] = Zyy
+            
+            if 'RealTzy' in dfs_freq.index and 'ImagTzy' in dfs_freq.index:
+                Tzy = complex(dfs_freq.loc['RealTzy'].value, 
+                              dfs_freq.loc['ImagTzy'].value)
+                mt_obj.Tipper.tipper[n, 0, 1] = Tzy
+            
+            if 'RealTzx' in dfs_freq.index and 'ImagTzx' in dfs_freq.index:
+                Tzy = complex(dfs_freq.loc['RealTzx'].value, 
+                              dfs_freq.loc['ImagTzx'].value)
+                mt_obj.Tipper.tipper[n, 0, 0] = Tzx
+            
+        mt_obj.Z.z *= factor
+        
+        mt_obj.Z.compute_resistivity_phase()
+        mt_obj.pt.set_z_object(mt_obj.Z)
+        mt_obj.Tipper.compute_amp_phase()
+        mt_obj.Tipper.compute_mag_direction()
+
+        mt_obj_list.append(mt_obj)
+        
     return mt_obj_list

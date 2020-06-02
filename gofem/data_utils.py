@@ -6,7 +6,7 @@
 import numpy as np
 import pandas as pd
 
-def read_modeling_output(file_format, frequencies):
+def read_modeling_responses(file_format, frequencies):
     """
         Read GoFEM forward modelling output. The GoFEM
         file name convention is the following:
@@ -19,8 +19,8 @@ def read_modeling_output(file_format, frequencies):
         
         :Example: ::
         
-        >>> read_modeling_output('./results/output_c=0_f=%.8e.txt', 
-                                 frequencies = [0.1, 0.01])
+        >>> read_modeling_responses('./results/output_c=0_f=%.8e.txt', 
+                                    frequencies = [0.1, 0.01])
         
         This call will look for the following files:
         
@@ -50,3 +50,13 @@ def read_modeling_output(file_format, frequencies):
             
 
     return data_frames
+
+
+def read_inversion_responses(datafile):
+    """
+        Read GoFEM modelled data from inversion. The GoFEM
+        file name convention is the following.
+    """
+    
+    df = pd.DataFrame()
+    df = pd.read_csv(file_format % frequencies[fidx], sep="\t")
