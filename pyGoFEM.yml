@@ -1,4 +1,4 @@
-name: gofem
+name: pygofem
 channels:
   - conda-forge
   - defaults
@@ -13,4 +13,5 @@ dependencies:
   - dealii
   - cartopy
   - pandas
+  - geopandas
 
