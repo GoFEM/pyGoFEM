@@ -15,7 +15,7 @@ from mtpy.core.edi_collection import EdiCollection
 
 from gofem.data_utils import *
 
-def write_edi_collection_to_gofem(edi_collection, outfile, error_floor, data_type = 'Z'):
+def write_edi_collection_to_gofem(edi_collection, outfile, error_floor = 0.05, data_type = 'Z', period_range = [-math.inf, math.inf]):
     '''
         Write down MT impdeance tensors from the edi collection 
         to the GoFEM data file with the given error floor.
@@ -57,6 +57,11 @@ def write_edi_collection_to_gofem(edi_collection, outfile, error_floor, data_typ
     factor = (4 * math.pi) / 10000.0
     
     for freq in edi_collection.all_frequencies:
+        
+        period = 1./freq
+        if period < period_range[0] or period > period_range[1]:
+            continue
+        
         for mt_obj in edi_collection.mt_obj_list:
             freq_max = freq * (1 + ptol)
             freq_min = freq * (1 - ptol)
