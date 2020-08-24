@@ -256,10 +256,10 @@ class Topography:
         if dist <= 1.:
             z_hat = z
             if zt < 0: # land
-                if (z - zt) < 0: 
-                    z_hat = self.z_top_land * (z - zt) / (self.z_top_land + zt) # z is above ground
-                else:
-                    z_hat = self.z_bottom * (z - zt) / (self.z_bottom - zt) # z is below ground
+                if (z >= self.z_top_land) and (z <= zt):
+                    z_hat = (self.z_0_land * self.z_top_land - self.z_0_land * z + self.z_top_land * z - self.z_top_land * zt) / (self.z_top_land - zt)
+                elif(z > zt) and (z <= self.z_bottom):
+                    z_hat = (self.z_0_land * self.z_bottom - self.z_0_land * z + self.z_bottom * z - self.z_bottom * zt) / (self.z_bottom - zt)
             elif zt > 0: # sea
                 if (z >= self.z_top_sea) and (z <= zt):
                     z_hat = (self.z_0_sea * self.z_top_sea - self.z_0_sea * z + self.z_top_sea * z - self.z_top_sea * zt) / (self.z_top_sea - zt)
@@ -287,10 +287,12 @@ class Topography:
         if dist <= 1.:
             z = z_hat
             if zt < 0: # land
-                if z_hat < 0: 
-                    z = z_hat + (z_hat + self.z_top_land) / (self.z_top_land - self.z_0_land) * zt # z is above ground
-                else:
-                    z = z_hat - (z_hat - self.z_bottom) / (self.z_bottom - self.z_0_land) * zt # z is below ground
+                if (z_hat >= self.z_top_land) and (z_hat <= self.z_0_land):
+                    z = (self.z_0_land - zt) / (self.z_0_land - self.z_top_land) * self.z_top_land +\
+                        (zt - self.z_top_land) / (self.z_0_land - self.z_top_land) * z_hat
+                elif (z_hat > self.z_0_land) and (z_hat <= self.z_bottom):
+                    z = (self.z_bottom - zt) / (self.z_bottom - self.z_0_land) * z_hat +\
+                        (zt - self.z_0_land) / (self.z_bottom - self.z_0_land) * self.z_bottom
             elif zt > 0: # sea
                 if (z_hat >= self.z_top_sea) and (z_hat <= self.z_0_sea):
                     z = (self.z_0_sea - zt) / (self.z_0_sea - self.z_top_sea) * self.z_top_sea +\
