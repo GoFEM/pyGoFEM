@@ -3,11 +3,13 @@
     
     Alexander Grayver, 2019 - 2020
 '''
+import math
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 from functools import partial
+from shapely.geometry import Point
 
 def plot_2d_triangulation(triangulation, color_scheme = None):
     
@@ -71,6 +73,77 @@ def is_within_ellipsoid(point, center, radii, pnorm = 2):
 
     return within
 
+def polar_transform(p):
+    '''
+        Transform [phi (0..2pi), theta (0..pi), r] to [X,Y,Z] in ECEF frame. 
+    '''
+    return  [p[2] * math.sin(p[1]) * math.cos(p[0]),
+             p[2] * math.sin(p[1]) * math.sin(p[0]),
+             p[2] * math.cos(p[1])]
+
+def alpha_shape(points, alpha):
+    """
+    Compute the alpha shape (concave hull) of a set of points.
+
+    @param points: Iterable container of points.
+    @param alpha: alpha value to influence the gooeyness of the border. Smaller
+                  numbers don't fall inward as much as larger numbers. Too large,
+                  and you lose everything!
+                  
+    (c) https://gist.github.com/dwyerk/10561690
+    """
+    
+    from shapely.ops import cascaded_union, polygonize
+    from scipy.spatial import Delaunay
+    import shapely.geometry as geometry
+
+    if len(points) < 4:
+        # When you have a triangle, there is no sense in computing an alpha
+        # shape.
+        return geometry.MultiPoint(list(points)).convex_hull
+
+    def add_edge(edges, edge_points, coords, i, j):
+        """Add a line between the i-th and j-th points, if not in the list already"""
+        if (i, j) in edges or (j, i) in edges:
+            # already added
+            return
+        edges.add( (i, j) )
+        edge_points.append(coords[ [i, j] ])
+
+    coords = np.array([point.coords[0] for point in points])
+
+    tri = Delaunay(coords)
+    edges = set()
+    edge_points = []
+    # loop over triangles:
+    # ia, ib, ic = indices of corner points of the triangle
+    for ia, ib, ic in tri.vertices:
+        pa = coords[ia]
+        pb = coords[ib]
+        pc = coords[ic]
+
+        # Lengths of sides of triangle
+        a = math.sqrt((pa[0]-pb[0])**2 + (pa[1]-pb[1])**2)
+        b = math.sqrt((pb[0]-pc[0])**2 + (pb[1]-pc[1])**2)
+        c = math.sqrt((pc[0]-pa[0])**2 + (pc[1]-pa[1])**2)
+
+        # Semiperimeter of triangle
+        s = (a + b + c)/2.0
+
+        # Area of triangle by Heron's formula
+        area = math.sqrt(s*(s-a)*(s-b)*(s-c))
+        circum_r = a*b*c/(4.0*area)
+
+        # Here's the radius filter.
+        #print circum_r
+        if circum_r < 1.0/alpha:
+            add_edge(edges, edge_points, coords, ia, ib)
+            add_edge(edges, edge_points, coords, ib, ic)
+            add_edge(edges, edge_points, coords, ic, ia)
+
+    m = geometry.MultiLineString(edge_points)
+    triangles = list(polygonize(m))
+    return cascaded_union(triangles), edge_points
 
 def refine_at_interface(triangulation, material_ids, repeat = 1, center = None, radii = None, pnorm = 2):
     '''
@@ -120,7 +193,95 @@ def refine_around_points(triangulation, points, center, radii, repeat = 1, exclu
                     
         triangulation.execute_coarsening_and_refinement()
         
-def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radii, repeat = 1, pnorm = 2):
+        
+def refine_via_callback(triangulation, refine_callback, repeat = 1):
+    '''
+        Refine cells for which refine_callback gives true
+    '''
+    
+    dim = triangulation.dim()
+        
+    for i in range(repeat):
+        for cell in triangulation.active_cells():
+            if refine_callback(cell):
+                cell.refine_flag = 'isotropic'
+                    
+        triangulation.execute_coarsening_and_refinement()
+            
+        
+def points_in_polygon(points_xy, polygon, quadrat_width):
+    
+    import osmnx as ox
+    import geopandas as gpd
+    import pandas as pd
+    from shapely.geometry import Polygon, MultiPolygon, Point
+    
+    gdf_nodes = gpd.GeoDataFrame(data={'x':points_xy[0], 'y':points_xy[1]})
+    gdf_nodes.name = 'nodes'
+    gdf_nodes['geometry'] = gdf_nodes.apply(lambda row: Point((row['x'], row['y'])), axis=1)
+    
+    geometry_cut = ox.utils_geo._quadrat_cut_geometry(polygon, quadrat_width=quadrat_width)
+
+    # build the r-tree index
+    sindex = gdf_nodes.sindex
+
+    # find the points that intersect with each subpolygon and add them to points_within_geometry
+    points_within = pd.DataFrame()
+    for poly in geometry_cut:
+        # buffer by the <1 micron dist to account for any space lost in the quadrat cutting
+        # otherwise may miss point(s) that lay directly on quadrat line
+        poly = poly.buffer(1e-14).buffer(0)
+
+        # find approximate matches with r-tree, then precise matches from those approximate ones
+        possible_matches_index = list(sindex.intersection(poly.bounds))
+        possible_matches = gdf_nodes.iloc[possible_matches_index]
+        precise_matches = possible_matches[possible_matches.intersects(poly)]
+        points_within = points_within.append(precise_matches)
+
+    points_outside = gdf_nodes[~gdf_nodes.isin(points_within)]
+    
+    return points_within, points_outside
+
+
+def refine_within_polygon(triangulation, polygon, quadrat_width, repeat = 1, z_range = [float('-inf'), float('inf')], n_quadrats = 10):
+    '''
+        Refine cells for which refine_callback gives true
+    '''
+    
+    import shapely.geometry
+    
+    dim = triangulation.dim()
+    
+    assert dim == 3
+
+    qwidth = (polygon.bounds[2] - polygon.bounds[0]) / n_quadrats
+    
+    for i in range(repeat):
+        
+        xc = []
+        yc = []
+        idx = 0
+        cell_indices = dict()
+        for cell in triangulation.active_cells():    
+            center = cell.center().to_list()
+            
+            if center[2] > z_range[0] and center[2] < z_range[1]:
+                xc.append(center[0])
+                yc.append(center[1])
+                cell_indices[(cell.level(), cell.index())] = idx
+                idx += 1
+        
+        points_in, points_out = points_in_polygon([xc, yc], polygon, quadrat_width = qwidth)
+                
+        for cell in triangulation.active_cells():
+            if (cell.level(), cell.index()) in cell_indices.keys() and\
+               cell_indices[(cell.level(), cell.index())] in points_in.index:
+                cell.refine_flag = 'isotropic'
+                
+        triangulation.execute_coarsening_and_refinement()
+    
+        
+def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radii, n_quadrats = 10, repeat = 1, pnorm = 2, top_face = 4):
     '''
         
     '''
@@ -129,8 +290,26 @@ def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radi
     dim = triangulation.dim()
     
     assert dim == 3
+
+    qwidth = (polygon.bounds[2] - polygon.bounds[0]) / n_quadrats
     
     for i in range(repeat):
+        
+        xc = []
+        yc = []
+        idx = 0
+        cell_indices = dict()
+        for cell in triangulation.cells():    
+            cell_center = cell.center().to_list()
+            xc.append(cell_center[0])
+            yc.append(cell_center[1])
+            
+            cell_indices[(cell.level(), cell.index())] = idx
+            
+            idx += 1
+        
+        points_in, points_out = points_in_polygon([xc, yc], polygon, quadrat_width = qwidth)
+        
         for cell in triangulation.active_cells():
             if cell.material_id == material_id:
                 continue
@@ -140,11 +319,9 @@ def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radi
             if not is_within_ellipsoid(cell_center[:dim-1], center[:dim-1], radii[:dim-1], pnorm):
                 continue
                 
-            point = shapely.geometry.Point(cell_center[0], cell_center[1])
-            is_cell_inside = polygon.contains(point)
+            is_cell_inside = cell_indices[(cell.level(), cell.index())] in points_in.index
             
             faces = cell.faces()
-            top_face = 4
             if not faces[top_face].at_boundary():
                 top_material_id = cell.neighbor(top_face).material_id
                 if top_material_id != material_id:
@@ -154,10 +331,7 @@ def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radi
                 if not face.at_boundary():
                     neighbor = cell.neighbor(n)
                     
-                    neighbor_center = neighbor.center().to_list()
-                    
-                    point = shapely.geometry.Point(neighbor_center[0], neighbor_center[1])
-                    is_neighbor_inside = polygon.contains(point)
+                    is_neighbor_inside = cell_indices[(neighbor.level(), neighbor.index())] in points_in.index
                     
                     if is_cell_inside != is_neighbor_inside:
                         cell.refine_flag = 'isotropic'
@@ -216,9 +390,11 @@ def project_points_on_interface(triangulation, points, material_id, mapping):
             face_no += 1
             
     return projected_points
+
         
 class Topography:
-    def __init__(self, topography, dim, center, radii, pnorm = 2):
+
+    def __init__(self, topography, dim, center, radii, pnorm = 2, shoreline = None):
         self.topography = topography
         self.center = center
         self.radii = radii
@@ -227,12 +403,15 @@ class Topography:
         
         self.z_top_sea = 0
         self.z_0_land = 0
+
+        self.shoreline = shoreline
         
-    def fit_to(self, triangulation, z_top, z_bottom, z_mean_bathymetry = 0, inverse = False):
+    def fit_to(self, triangulation, z_top, z_bottom, z_mean_bathymetry = 0, ignore_bathymetry_distance = 0., inverse = False):
         
         self.z_top_land = z_top
         self.z_bottom = z_bottom
         self.z_0_sea = z_mean_bathymetry
+        self.ignore_distance = ignore_bathymetry_distance
         
         if inverse:
             transformation = partial(self.__pull_back)
@@ -251,6 +430,10 @@ class Topography:
         for d in range(self.dim):
             dist += abs(self.center[d] - p[d])**self.pnorm / self.radii[d]**self.pnorm
                 
+        dist_to_shoreline = 1e10
+        if(self.shoreline != None and self.ignore_distance > 0):
+            dist_to_shoreline = self.shoreline.exterior.distance(Point(p_hat[0], p_hat[1]))
+
         zt = self.topography(p[:-1])
                 
         if dist <= 1.:
@@ -260,7 +443,7 @@ class Topography:
                     z_hat = (self.z_0_land * self.z_top_land - self.z_0_land * z + self.z_top_land * z - self.z_top_land * zt) / (self.z_top_land - zt)
                 elif(z > zt) and (z <= self.z_bottom):
                     z_hat = (self.z_0_land * self.z_bottom - self.z_0_land * z + self.z_bottom * z - self.z_bottom * zt) / (self.z_bottom - zt)
-            elif zt > 0: # sea
+            elif zt > 0 and dist_to_shoreline > self.ignore_distance: # sea
                 if (z >= self.z_top_sea) and (z <= zt):
                     z_hat = (self.z_0_sea * self.z_top_sea - self.z_0_sea * z + self.z_top_sea * z - self.z_top_sea * zt) / (self.z_top_sea - zt)
                 elif(z > zt) and (z <= self.z_bottom):
@@ -281,6 +464,10 @@ class Topography:
         dist = 0
         for d in range(self.dim):
             dist += abs(self.center[d] - p[d])**self.pnorm / self.radii[d]**self.pnorm
+
+        dist_to_shoreline = 1e10
+        if(self.shoreline != None and self.ignore_distance > 0):
+            dist_to_shoreline = self.shoreline.exterior.distance(Point(p_hat[0], p_hat[1]))
         
         zt = self.topography(p_hat[:-1])
         
@@ -293,7 +480,7 @@ class Topography:
                 elif (z_hat > self.z_0_land) and (z_hat <= self.z_bottom):
                     z = (self.z_bottom - zt) / (self.z_bottom - self.z_0_land) * z_hat +\
                         (zt - self.z_0_land) / (self.z_bottom - self.z_0_land) * self.z_bottom
-            elif zt > 0: # sea
+            elif zt > 0 and dist_to_shoreline > self.ignore_distance: # sea
                 if (z_hat >= self.z_top_sea) and (z_hat <= self.z_0_sea):
                     z = (self.z_0_sea - zt) / (self.z_0_sea - self.z_top_sea) * self.z_top_sea +\
                         (zt - self.z_top_sea) / (self.z_0_sea - self.z_top_sea) * z_hat

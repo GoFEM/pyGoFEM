@@ -35,6 +35,7 @@ class ParameterHandler:
                                       'DoFs budget':10000000,\
                                       'Number of initial refinements':0,\
                                       'Order':1,\
+                                      'Mapping order':1,\
                                       'BC':'Dirichlet',\
                                       'Number of parallel frequencies':1,\
                                       'Refine cells around receivers':0,\
@@ -115,19 +116,35 @@ class ParameterHandler:
         else:
             raise Exception('Section {} is not a valid section name.'.format(section))
             
+            
+    def print_all(self):
+        for section,parameters in self.parameters.items():
+            print('subsection {} parameters\n'.format(section))
+            for pname,pvalue in parameters.items():
+                if type(pvalue) is list:
+                    print('\tset {} = {}\n\n'.format(pname, ', '.join(map(str, pvalue))))
+                elif type(pvalue) is bool:
+                    print('\tset {} = {}\n\n'.format(pname, 'true' if pvalue else 'false'))
+                elif isinstance(pvalue, str):
+                    if len(pvalue):
+                        print('\tset {} = {}\n\n'.format(pname, pvalue))
+                else:
+                    print('\tset {} = {}\n\n'.format(pname, pvalue))
+            print('end\n\n\n')
+            
         
     def write(self,filename):
         with open(filename, 'w') as f:
             for section,parameters in self.parameters.items():
                 f.write('subsection {} parameters\n'.format(section))
                 for pname,pvalue in parameters.items():
-                    if not pvalue:
-                        continue
-                    
                     if type(pvalue) is list:
                         f.write('\tset {} = {}\n\n'.format(pname, ', '.join(map(str, pvalue))))
                     elif type(pvalue) is bool:
                         f.write('\tset {} = {}\n\n'.format(pname, 'true' if pvalue else 'false'))
+                    elif isinstance(pvalue, str):
+                        if len(pvalue):
+                            f.write('\tset {} = {}\n\n'.format(pname, pvalue))
                     else:
                         f.write('\tset {} = {}\n\n'.format(pname, pvalue))
                 f.write('end\n\n\n')
