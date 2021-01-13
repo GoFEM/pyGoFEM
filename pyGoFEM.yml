@@ -4,10 +4,14 @@ channels:
   - defaults
 dependencies:
   - python=3.7
+  - ipywidgets
   - mpich
   - hdf5[build=mpi_mpich*]
   - netcdf4
+  - jupyter
   - jupyterlab
+  - nb_conda_kernels
+  - ipython
   - matplotlib
   - numpy
   - dealii
@@ -15,4 +19,5 @@ dependencies:
   - pandas
   - geopandas
   - osmnx
-
+  - nodejs
+  - paraview

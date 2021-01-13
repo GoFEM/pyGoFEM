@@ -11,7 +11,7 @@ from matplotlib.collections import PatchCollection
 from functools import partial
 from shapely.geometry import Point
 
-def plot_2d_triangulation(triangulation, color_scheme = None):
+def plot_2d_triangulation(triangulation, color_scheme = None, edge_color = 'k'):
     
     fig, ax = plt.subplots()
     patches = []
@@ -32,7 +32,7 @@ def plot_2d_triangulation(triangulation, color_scheme = None):
         if color_scheme:
             colors.append(color_scheme(cell))
 
-    p = PatchCollection(patches, edgecolors='k', facecolors=None)
+    p = PatchCollection(patches, edgecolors=edge_color, facecolors=None)
     p.set_array(np.array(colors))
     
     ax.add_collection(p)
@@ -243,7 +243,7 @@ def points_in_polygon(points_xy, polygon, quadrat_width):
     return points_within, points_outside
 
 
-def refine_within_polygon(triangulation, polygon, quadrat_width, repeat = 1, z_range = [float('-inf'), float('inf')], n_quadrats = 10):
+def refine_within_polygon(triangulation, polygon, repeat = 1, z_range = [float('-inf'), float('inf')], n_quadrats = 10):
     '''
         Refine cells for which refine_callback gives true
     '''
@@ -432,7 +432,10 @@ class Topography:
                 
         dist_to_shoreline = 1e10
         if(self.shoreline != None and self.ignore_distance > 0):
-            dist_to_shoreline = self.shoreline.exterior.distance(Point(p_hat[0], p_hat[1]))
+            if(self.dim == 3):
+                dist_to_shoreline = self.shoreline.exterior.distance(Point(p_hat[0], p_hat[1]))
+            elif self.dim == 2:
+                dist_to_shoreline = abs(p_hat[0] - self.shoreline)
 
         zt = self.topography(p[:-1])
                 
@@ -467,7 +470,10 @@ class Topography:
 
         dist_to_shoreline = 1e10
         if(self.shoreline != None and self.ignore_distance > 0):
-            dist_to_shoreline = self.shoreline.exterior.distance(Point(p_hat[0], p_hat[1]))
+            if(self.dim == 3):
+                dist_to_shoreline = self.shoreline.exterior.distance(Point(p_hat[0], p_hat[1]))
+            elif self.dim == 2:
+                dist_to_shoreline = abs(p_hat[0] - self.shoreline)
         
         zt = self.topography(p_hat[:-1])
         
