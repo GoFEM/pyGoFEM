@@ -15,7 +15,7 @@ from mtpy.core.edi_collection import EdiCollection
 
 from gofem.data_utils import *
 
-def write_edi_collection_to_gofem(edi_collection, outfile, error_floor = 0.05, data_type = 'Z', period_range = [-math.inf, math.inf]):
+def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = None, error_floor = 0.05, data_type = 'Z', period_range = [-math.inf, math.inf]):
     '''
         Write down MT impdeance tensors from the edi collection 
         to the GoFEM data file with the given error floor.
@@ -32,7 +32,7 @@ def write_edi_collection_to_gofem(edi_collection, outfile, error_floor = 0.05, d
     '''
 
     mt_data = []
-    ptol = 0.03
+    ptol = 0.05
     
     str_codes = []
     if data_type == 'Z_offdiag':
@@ -56,13 +56,28 @@ def write_edi_collection_to_gofem(edi_collection, outfile, error_floor = 0.05, d
     # Convert from [mV/km]/[nT] to Ohm
     factor = (4 * math.pi) / 10000.0
     
-    for freq in edi_collection.all_frequencies:
+    if mt_objects is not None:
+        all_frequencies = []
+        
+        for mt_obj in mt_objects:
+            for freq in mt_obj.Z.freq:
+                freq_max = freq * (1 + ptol)
+                freq_min = freq * (1 - ptol)
+                f_index_list = np.where((all_frequencies < freq_max) & (all_frequencies > freq_min))[0]    
+                
+                if f_index_list.size == 0:
+                    all_frequencies.append(freq)
+    else:
+        all_frequencies = edi_collection.all_frequencies
+        mt_objects = edi_collection.mt_obj_list
+    
+    for freq in all_frequencies:
         
         period = 1./freq
         if period < period_range[0] or period > period_range[1]:
             continue
         
-        for mt_obj in edi_collection.mt_obj_list:
+        for mt_obj in mt_objects:
             freq_max = freq * (1 + ptol)
             freq_min = freq * (1 - ptol)
             f_index_list = np.where((mt_obj.Z.freq < freq_max) & (mt_obj.Z.freq > freq_min))[0]
