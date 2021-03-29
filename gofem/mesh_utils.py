@@ -83,9 +83,14 @@ def polar_transform(p):
 
 def create_part_shell(phi_limits, theta_limits, r_limits, n_cells_phi, n_cells_theta, dr):
     
+    '''
+        Create part shell mesh given lateral limits and radial discretization
+        Input angles are in radians, radial discretization is in metres
+    '''
+    
     import PyDealII.Release as dealii
     
-    lat_limits = [90. - theta_limits[1], 90. - theta_limits[0]]
+    lat_limits = [pi/2. - theta_limits[1], pi/2. - theta_limits[0]]
     
     p_begin = dealii.Point([phi_limits[0], lat_limits[0], r_limits[0]])
     p_end = dealii.Point([phi_limits[1], lat_limits[1], r_limits[1]])
