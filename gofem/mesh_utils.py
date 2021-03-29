@@ -81,6 +81,28 @@ def polar_transform(p):
              p[2] * math.sin(p[1]) * math.sin(p[0]),
              p[2] * math.cos(p[1])]
 
+def create_part_shell(phi_limits, theta_limits, r_limits, n_cells_phi, n_cells_theta, dr):
+    
+    import PyDealII.Release as dealii
+    
+    lat_limits = [90. - theta_limits[1], 90. - theta_limits[0]]
+    
+    p_begin = dealii.Point([phi_limits[0], lat_limits[0], r_limits[0]])
+    p_end = dealii.Point([phi_limits[1], lat_limits[1], r_limits[1]])
+
+    dtheta = np.ones(n_cells_theta) * (theta_limits[1] - theta_limits[0]) / n_cells_theta
+    dphi = np.ones(n_cells_phi) * (phi_limits[1] - phi_limits[0]) / n_cells_phi
+
+    triangulation = dealii.Triangulation('3D')
+    triangulation.generate_subdivided_steps_hyper_rectangle([dphi.tolist(),\
+                                                             dtheta.tolist(),\
+                                                             np.flip(dr).tolist()], p_begin, p_end, False)
+    
+    lat2colat = lambda p: [p[0], math.pi / 2. - p[1], p[2]]
+    triangulation.transform(lat2colat)
+    
+    return triangulation
+
 def alpha_shape(points, alpha):
     """
     Compute the alpha shape (concave hull) of a set of points.
