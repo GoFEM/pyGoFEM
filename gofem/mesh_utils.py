@@ -90,7 +90,7 @@ def create_part_shell(phi_limits, theta_limits, r_limits, n_cells_phi, n_cells_t
     
     import PyDealII.Release as dealii
     
-    lat_limits = [pi/2. - theta_limits[1], pi/2. - theta_limits[0]]
+    lat_limits = [math.pi/2. - theta_limits[1], math.pi/2. - theta_limits[0]]
     
     p_begin = dealii.Point([phi_limits[0], lat_limits[0], r_limits[0]])
     p_end = dealii.Point([phi_limits[1], lat_limits[1], r_limits[1]])
@@ -326,14 +326,24 @@ def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radi
         yc = []
         idx = 0
         cell_indices = dict()
-        for cell in triangulation.cells():    
+        for cell in triangulation.active_cells():    
             cell_center = cell.center().to_list()
             xc.append(cell_center[0])
             yc.append(cell_center[1])
             
             cell_indices[(cell.level(), cell.index())] = idx
-            
             idx += 1
+
+            for n, face in enumerate(cell.faces()):
+                if not face.at_boundary():
+                    neighbor = cell.neighbor(n)
+                    
+                    if (neighbor.level(), neighbor.index()) not in cell_indices:
+                        neighbor_center = neighbor.center().to_list()
+                        xc.append(neighbor_center[0])
+                        yc.append(neighbor_center[1])
+                        cell_indices[(neighbor.level(), neighbor.index())] = idx
+                        idx += 1
         
         points_in, points_out = points_in_polygon([xc, yc], polygon, quadrat_width = qwidth)
         
