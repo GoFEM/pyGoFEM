@@ -405,8 +405,8 @@ def project_points_on_interface(triangulation, points, material_id, mapping):
                         face_v.append(face.get_vertex(i))
                         
                     for point in points:
-                        px = point[0];
-                        py = point[1];
+                        px = point[0]
+                        py = point[1]
 
                         within = (px >= face_v[0].x) and (px < face_v[1].x)
                         if dim == 3:

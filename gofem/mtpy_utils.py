@@ -124,10 +124,10 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
                     mt_data.append([str_codes[7], freq, mt_obj.station, zobj.phase[p_index, 1, 1], zobj.phase_err[p_index, 1, 1]])
                     
             elif data_type == 'Tipper':
-                mt_data.append([str_codes[0], freq, mt_obj.station, tobj.tipper[p_index, 0, 0].real, tobj.tipper_err[p_index, 0, 0]])
-                mt_data.append([str_codes[1], freq, mt_obj.station, tobj.tipper[p_index, 0, 0].imag, tobj.tipper_err[p_index, 0, 0]])
-                mt_data.append([str_codes[2], freq, mt_obj.station, tobj.tipper[p_index, 0, 1].real, tobj.tipper_err[p_index, 0, 1]])
-                mt_data.append([str_codes[3], freq, mt_obj.station, tobj.tipper[p_index, 0, 1].imag, tobj.tipper_err[p_index, 0, 1]])
+                mt_data.append([str_codes[0], freq, mt_obj.station, tobj.tipper[p_index, 0, 0].real, max(tobj.tipper_err[p_index, 0, 0], error_floor)])
+                mt_data.append([str_codes[1], freq, mt_obj.station, tobj.tipper[p_index, 0, 0].imag, max(tobj.tipper_err[p_index, 0, 0], error_floor)])
+                mt_data.append([str_codes[2], freq, mt_obj.station, tobj.tipper[p_index, 0, 1].real, max(tobj.tipper_err[p_index, 0, 1], error_floor)])
+                mt_data.append([str_codes[3], freq, mt_obj.station, tobj.tipper[p_index, 0, 1].imag, max(tobj.tipper_err[p_index, 0, 1], error_floor)])
 
             elif data_type == 'PT':
                 mt_data.append([str_codes[0], freq, mt_obj.station, ptobj.pt[p_index, 0, 0].real, ptobj.pt_err[p_index, 0, 0]])
