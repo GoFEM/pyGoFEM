@@ -81,6 +81,29 @@ def polar_transform(p):
              p[2] * math.sin(p[1]) * math.sin(p[0]),
              p[2] * math.cos(p[1])]
 
+def cartesian_transform(p):
+    '''
+        Transform [X,Y,Z] in ECEF frame to [phi (0..2pi), theta (0..pi), r]. 
+    '''
+    
+    p_spherical = [0,0,0]
+    
+    # radius
+    p_spherical[2] = math.sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2])
+    
+    # azimuth angle
+    p_spherical[0] = math.atan2(p[1], p[0])
+    # correct to [0,2*pi)
+    if (p_spherical[0] < 0.0):
+        p_spherical[0] += 2.0 * math.pi
+
+    # polar angle
+    # acos returns the angle in the range [0,\pi]
+    if p_spherical[2] > 1e-16:
+        p_spherical[1] = math.acos(p[2] / p_spherical[2])
+    
+    return p_spherical
+
 def create_part_shell(phi_limits, theta_limits, r_limits, n_cells_phi, n_cells_theta, dr):
     
     '''

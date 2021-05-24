@@ -140,7 +140,9 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
         idx = 0
         for idx in range(len(mt_data)):
             data_row = mt_data[idx]
-            f.write("%s %0.6e Plane_wave %s %0.6e %0.6e\n" % (data_row[0], data_row[1], data_row[2], data_row[3], data_row[4]))
+            
+            if math.abs(data_row[3]) > 1e-25 and math.isfinite(data_row[3]):
+                f.write("%s %0.6e Plane_wave %s %0.6e %0.6e\n" % (data_row[0], data_row[1], data_row[2], data_row[3], data_row[4]))
 
 
 def read_gofem_modelling_output(fileformat, frequency_list, station_list, station_coords):
