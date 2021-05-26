@@ -275,7 +275,7 @@ def read_gofem_inversion_output(data_file):
                 mt_obj.Tipper.tipper[n, 0, 1] = Tzy
             
             if 'RealTzx' in dfs_freq.index and 'ImagTzx' in dfs_freq.index:
-                Tzy = complex(dfs_freq.loc['RealTzx'].value, 
+                Tzx = complex(dfs_freq.loc['RealTzx'].value, 
                               dfs_freq.loc['ImagTzx'].value)
                 mt_obj.Tipper.tipper[n, 0, 0] = Tzx
             
