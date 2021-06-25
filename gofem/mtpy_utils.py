@@ -253,33 +253,40 @@ def read_gofem_inversion_output(data_file):
                 Zxx = complex(dfs_freq.loc['RealZxx'].value, 
                               dfs_freq.loc['ImagZxx'].value)
                 mt_obj.Z.z[n, 0, 0] = Zxx
+                mt_obj.Z.z_err[n, 0, 0] = dfs_freq.loc['RealZxx'].std_error
             
             if 'RealZxy' in dfs_freq.index and 'ImagZxy' in dfs_freq.index:
                 Zxy = complex(dfs_freq.loc['RealZxy'].value, 
                               dfs_freq.loc['ImagZxy'].value)
                 mt_obj.Z.z[n, 0, 1] = Zxy
+                mt_obj.Z.z_err[n, 0, 1] = dfs_freq.loc['RealZxy'].std_error
             
             if 'RealZyx' in dfs_freq.index and 'ImagZyx' in dfs_freq.index:
                 Zyx = complex(dfs_freq.loc['RealZyx'].value, 
                               dfs_freq.loc['ImagZyx'].value)
                 mt_obj.Z.z[n, 1, 0] = Zyx
+                mt_obj.Z.z_err[n, 1, 0] = dfs_freq.loc['RealZyx'].std_error
             
             if 'RealZyy' in dfs_freq.index and 'ImagZyy' in dfs_freq.index:
                 Zyy = complex(dfs_freq.loc['RealZyy'].value, 
                               dfs_freq.loc['ImagZyy'].value)
                 mt_obj.Z.z[n, 1, 1] = Zyy
+                mt_obj.Z.z_err[n, 1, 1] = dfs_freq.loc['RealZyy'].std_error
             
             if 'RealTzy' in dfs_freq.index and 'ImagTzy' in dfs_freq.index:
                 Tzy = complex(dfs_freq.loc['RealTzy'].value, 
                               dfs_freq.loc['ImagTzy'].value)
                 mt_obj.Tipper.tipper[n, 0, 1] = Tzy
+                mt_obj.Tipper.tipper_err[n, 0, 1] = dfs_freq.loc['RealTzy'].std_error
             
             if 'RealTzx' in dfs_freq.index and 'ImagTzx' in dfs_freq.index:
                 Tzx = complex(dfs_freq.loc['RealTzx'].value, 
                               dfs_freq.loc['ImagTzx'].value)
                 mt_obj.Tipper.tipper[n, 0, 0] = Tzx
+                mt_obj.Tipper.tipper_err[n, 0, 0] = dfs_freq.loc['RealTzx'].std_error
             
         mt_obj.Z.z *= factor
+        mt_obj.Z.z_err *= factor
         
         mt_obj.Z.compute_resistivity_phase()
         mt_obj.pt.set_z_object(mt_obj.Z)
@@ -288,4 +295,4 @@ def read_gofem_inversion_output(data_file):
 
         mt_obj_list.append(mt_obj)
         
-    return mt_obj_list
+    return mt_obj_list, all_frequencies
