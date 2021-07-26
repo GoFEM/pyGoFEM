@@ -6,7 +6,7 @@ See jupyter notebooks for examples on how to setup GoFEM with python and process
 
 # Installation
 
-**Note**: instructions below should work for linux and OSX systems. On Windows, you can use [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl).
+**Warning**: instructions below should work for Linux-based operating systems. On Windows, you can use [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl). Note that WSL version 2 is needed. 
 
 It is easiest to setup the pyGoFEM via [conda](https://docs.conda.io/en/latest/). Just deploy the environment using the environment file *pyGoFEM.yml* as:
 
