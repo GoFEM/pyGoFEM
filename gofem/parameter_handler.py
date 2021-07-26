@@ -40,7 +40,8 @@ class ParameterHandler:
                                       'Number of parallel frequencies':1,\
                                       'Refine cells around receivers':0,\
                                       'Field formulation':'E',\
-                                      'Field approach':'Total'}
+                                      'Field approach':'Total',\
+                                      'Source type':'SH'}
         
         if dim == 2:
             self.parameters['2.5D'] = {'Minimum and maximun wavenumbers': [1e-5, 1e-1],\

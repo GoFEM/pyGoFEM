@@ -211,7 +211,7 @@ def read_gofem_inversion_output(data_file):
     '''
     
     colnames = ['type', 'frequency', 'source', 'station', 'value', 'std_error']
-    df = pd.read_csv(data_file, sep="\t+", header=None, names=colnames)
+    df = pd.read_csv(data_file, sep="[ \t]+", header=None, names=colnames, comment='#')
 
     all_frequencies = df['frequency'].unique()
     stations = df['station'].unique()
