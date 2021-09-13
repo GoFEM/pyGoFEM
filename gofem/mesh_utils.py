@@ -331,7 +331,7 @@ def refine_within_polygon(triangulation, polygon, repeat = 1, z_range = [float('
         triangulation.execute_coarsening_and_refinement()
     
         
-def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radii, n_quadrats = 10, repeat = 1, pnorm = 2, top_face = 4):
+def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radii, n_quadrats = 10, repeat = 1, pnorm = 1):
     '''
         
     '''
@@ -376,16 +376,17 @@ def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radi
             
             cell_center = cell.center().to_list()
             
-            if not is_within_ellipsoid(cell_center[:dim-1], center[:dim-1], radii[:dim-1], pnorm):
+#            if not is_within_ellipsoid(cell_center[:dim-1], center[:dim-1], radii[:dim-1], pnorm):
+            if not is_within_ellipsoid(cell_center, center, radii, pnorm):
                 continue
                 
             is_cell_inside = cell_indices[(cell.level(), cell.index())] in points_in.index
             
             faces = cell.faces()
-            if not faces[top_face].at_boundary():
-                top_material_id = cell.neighbor(top_face).material_id
-                if top_material_id != material_id:
-                    continue
+#            if not faces[top_face].at_boundary():
+#                top_material_id = cell.neighbor(top_face).material_id
+#                if top_material_id != material_id:
+#                    continue
             
             for n, face in enumerate(faces):
                 if not face.at_boundary():
