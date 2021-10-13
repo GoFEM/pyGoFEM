@@ -296,3 +296,185 @@ def read_gofem_inversion_output(data_file):
         mt_obj_list.append(mt_obj)
         
     return mt_obj_list, all_frequencies
+
+def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
+    
+    frequencies_mod = np.array([])
+    for mt_obj_modelled in mt_mod_list:
+        for frequency in mt_obj_modelled.Z.freq:
+            freq_max = frequency * (1 + ftol)
+            freq_min = frequency * (1 - ftol)
+            
+            fidx = np.where((frequencies_mod < freq_max) & (frequencies_mod > freq_min))[0]
+        
+            if np.size(fidx)==0:
+                frequencies_mod = np.append(frequencies_mod, frequency)
+            
+    stn_obs_codes = np.array([mt_obs.station for mt_obs in mt_obs_list])
+
+    mse_per_period = np.zeros(shape=(len(frequencies_mod),))
+    mse_per_station = np.zeros(shape=(len(stn_obs_codes),))
+    mse_total = 0
+
+    n_data_per_period = np.zeros(shape=(len(frequencies_mod),))
+    n_data_per_station = np.zeros(shape=(len(stn_obs_codes),))
+    
+    
+    # Compute the misfit for each station
+    for mt_obj_modelled in mt_mod_list:
+        sidx = np.where( stn_obs_codes == mt_obj_modelled.station )[0]
+                
+        if np.size(sidx)==0:
+            raise Exception('Your observed data file contains stations which are not in the modelled response file. Sure inversion was ran with this data file?')
+        else:
+            sidx = sidx[0]
+            
+        mt_obj_observed = mt_obs_list[sidx]
+    
+        mse_total_station = 0
+        for frequency in frequencies_mod:
+            freq_max = frequency * (1 + ftol)
+            freq_min = frequency * (1 - ftol)
+        
+            fidx_obs = np.where((mt_obj_observed.Z.freq < freq_max) & (mt_obj_observed.Z.freq > freq_min))[0]
+        
+            if np.size(fidx_obs)==0:
+                raise Exception('Your observed data file contains frequencies which are not in the modelled response file or vice versa. Sure inversion was ran with this data file?')
+            else:
+                fidx_obs = fidx_obs[0]
+                
+            fidx_mod = np.where((mt_obj_modelled.Z.freq < freq_max) & (mt_obj_modelled.Z.freq > freq_min))[0]
+            
+            if np.size(fidx_mod)==0:
+                raise Exception('This should not happen...')
+            else:
+                fidx_mod = fidx_mod[0]
+        
+            Z_obs = mt_obj_observed.Z.z[fidx_obs]
+            Z_mod = mt_obj_modelled.Z.z[fidx_mod]
+            Z_err = mt_obj_observed.Z.z_err[fidx_obs]
+        
+            mse = 0
+            # If Observation are mutted, skip
+            if np.all( Z_obs == 0 ):
+                continue
+                
+            # Full Impedance
+            if((np.abs(Z_obs[0,0]) > 0.) & (np.abs(Z_obs[1,1]) > 0.)):
+                mse = np.divide((Z_obs.real - Z_mod.real)**2, Z_err**2) +\
+                      np.divide((Z_obs.imag - Z_mod.imag)**2, Z_err**2)
+                mse = np.sum(mse)
+                n_data_per_period[fidx_obs] += 8
+                n_data_per_station[sidx] += 8
+            # Only off-diagonal components
+            else:
+                mse = np.divide((Z_obs.real - Z_mod.real)**2, Z_err**2) +\
+                      np.divide((Z_obs.imag - Z_mod.imag)**2, Z_err**2)
+                mse = mse[0,1] + mse[1,0]
+                n_data_per_period[fidx_obs] += 4
+                n_data_per_station[sidx] += 4
+            
+            mse_per_period[fidx_obs] += mse
+            mse_per_station[sidx] += mse
+            mse_total += mse
+            mse_total_station += mse
+
+        # remove misfit for station with very large rmse
+        #if np.sqrt(mse_total_station/n_data_per_station[sidx]) > 5:
+        #    mse_total -= mse_total_station
+
+    rmse_per_period = np.sqrt(np.divide(mse_per_period, n_data_per_period))
+    rmse_per_station = np.sqrt(np.divide(mse_per_station, n_data_per_station))
+    rmse_total = np.sqrt(mse_total / np.sum(n_data_per_period))
+    
+    return rmse_total, rmse_per_station, rmse_per_period, 1./ frequencies_mod, stn_obs_codes
+
+
+def calculate_rms_T(mt_obs_list, mt_mod_list, ftol = 0.03):
+    
+    frequencies_mod = np.array([])
+    for mt_obj_modelled in mt_mod_list:
+        for frequency in mt_obj_modelled.Z.freq:
+            freq_max = frequency * (1 + ftol)
+            freq_min = frequency * (1 - ftol)
+            
+            fidx = np.where((frequencies_mod < freq_max) & (frequencies_mod > freq_min))[0]
+        
+            if np.size(fidx)==0:
+                frequencies_mod = np.append(frequencies_mod, frequency)
+            
+    stn_obs_codes = np.array([mt_obs.station for mt_obs in mt_obs_list])
+
+    mse_per_period = np.zeros(shape=(len(frequencies_mod),))
+    mse_per_station = np.zeros(shape=(len(stn_obs_codes),))
+    mse_total = 0
+
+    n_data_per_period = np.zeros(shape=(len(frequencies_mod),))
+    n_data_per_station = np.zeros(shape=(len(stn_obs_codes),))
+    
+    stations = []
+    
+    # Compute the misfit for each station
+    for mt_obj_modelled in mt_mod_list:
+        sidx = np.where( stn_obs_codes == mt_obj_modelled.station )[0]
+                
+        if np.size(sidx)==0:
+            raise Exception('Your modelled data file contains station ' + mt_obj_modelled.station + ' which is not in the observed response file. Sure both files came out of the same inversion run?')
+        else:
+            sidx = sidx[0]
+            
+        stations.append(mt_obj_modelled.station)
+
+        mt_obj_observed = mt_obs_list[sidx]
+    
+        for frequency in frequencies_mod:
+            freq_max = frequency * (1 + ftol)
+            freq_min = frequency * (1 - ftol)
+        
+            fidx_obs = np.where((mt_obj_observed.Tipper.freq < freq_max) & (mt_obj_observed.Tipper.freq > freq_min))[0]
+        
+            if np.size(fidx_obs)==0:
+                raise Exception('Your observed data file contains frequencies which are not in the modelled response file or vice versa. Sure inversion was ran with this data file?')
+            else:
+                fidx_obs = fidx_obs[0]
+                
+            fidx_mod = np.where((mt_obj_modelled.Tipper.freq < freq_max) & (mt_obj_modelled.Tipper.freq > freq_min))[0]
+            
+            if np.size(fidx_mod)==0:
+                raise Exception('This should not happen...')
+            else:
+                fidx_mod = fidx_mod[0]
+        
+            T_obs = mt_obj_observed.Tipper.tipper[fidx_obs]
+            T_err = mt_obj_observed.Tipper.tipper_err[fidx_obs]
+            
+            T_mod = mt_obj_modelled.Tipper.tipper[fidx_mod]
+        
+            mse = 0
+            # Tzx
+            if(np.abs(T_obs[0,0]) > 0.):
+                mse = (T_obs[0,0].real - T_mod[0,0].real)**2 / T_err[0,0]**2 +\
+                      (T_obs[0,0].imag - T_mod[0,0].imag)**2 / T_err[0,0]**2
+                n_data_per_period[fidx_obs] += 2
+                n_data_per_station[sidx] += 2
+                
+                mse_per_period[fidx_obs] += mse
+                mse_per_station[sidx] += mse
+                mse_total += mse
+            
+            # Tzy
+            if(np.abs(T_obs[0,1]) > 0.):
+                mse = (T_obs[0,1].real - T_mod[0,1].real)**2 / T_err[0,1]**2 +\
+                      (T_obs[0,1].imag - T_mod[0,1].imag)**2 / T_err[0,1]**2
+                n_data_per_period[fidx_obs] += 2
+                n_data_per_station[sidx] += 2
+            
+                mse_per_period[fidx_obs] += mse
+                mse_per_station[sidx] += mse
+                mse_total += mse
+        
+    rmse_per_period = np.sqrt(np.divide(mse_per_period, n_data_per_period))
+    rmse_per_station = np.sqrt(np.divide(mse_per_station, n_data_per_station))
+    rmse_total = np.sqrt(mse_total / np.sum(n_data_per_period))
+    
+    return rmse_total, rmse_per_station, rmse_per_period, 1./ frequencies_mod, stn_obs_codes

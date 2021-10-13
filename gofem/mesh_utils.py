@@ -494,7 +494,7 @@ class Topography:
         dist_to_shoreline = 1e10
         if(self.shoreline != None and self.ignore_distance > 0):
             if(self.dim == 3):
-                dist_to_shoreline = self.shoreline.exterior.distance(Point(p_hat[0], p_hat[1]))
+                dist_to_shoreline = self.shoreline.distance(Point(p_hat[0], p_hat[1]))
             elif self.dim == 2:
                 dist_to_shoreline = abs(p_hat[0] - self.shoreline)
 
@@ -532,7 +532,7 @@ class Topography:
         dist_to_shoreline = 1e10
         if(self.shoreline != None and self.ignore_distance > 0):
             if(self.dim == 3):
-                dist_to_shoreline = self.shoreline.exterior.distance(Point(p_hat[0], p_hat[1]))
+                dist_to_shoreline = self.shoreline.distance(Point(p_hat[0], p_hat[1]))
             elif self.dim == 2:
                 dist_to_shoreline = abs(p_hat[0] - self.shoreline)
         
