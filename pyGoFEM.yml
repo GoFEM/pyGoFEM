@@ -24,3 +24,6 @@ dependencies:
   - osmnx
   - nodejs
   - paraview
+  - h5py
+  - pyyaml
+  - meshio
