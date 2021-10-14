@@ -39,7 +39,7 @@ For more details check [this](https://docs.conda.io/projects/conda-build/en/late
 
 # Referencing
 
-When used, please aknowledge GoFEM by citing one or more of the following references
+Aknowledge GoFEM by citing one or more of the following references
 
 > Grayver A.V., 2015, *Parallel 3D magnetotelluric inversion using adaptive finite-element method. Part I: theory and synthetic study*, Geophysical Journal International, 202(1), pp. 584-603, doi: 10.1093/gji/ggv165
 
