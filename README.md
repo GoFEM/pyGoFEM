@@ -6,7 +6,7 @@ See jupyter notebooks for examples on how to setup GoFEM with python and process
 
 # Installation
 
-**Warning**: instructions below should work for Linux-based operating systems. On Windows, you can use [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl). Note that WSL version 2 is needed. 
+### Linux
 
 It is easiest to setup the pyGoFEM via [conda](https://docs.conda.io/en/latest/). Just deploy the environment using the environment file *pyGoFEM.yml* as:
 
@@ -16,6 +16,26 @@ conda activate pygofem
 ```
 
 That is it! You should now be able to run the tutorial notebooks.
+
+### Windows
+
+On Windows, you can use [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl). Note that WSL version 2 or newer is needed. 
+
+### macOS
+
+The process is identical to **Linux**. However, you may need to replace linux compiler packages in the *pyGoFEM.yml* files. Specifically, these
+
+- gcc_linux-64
+- gxx_linux-64
+- gfortran_linux-64
+
+should be replaced by
+
+- clang_osx-64
+- clangxx_osx-64
+- gfortran_osx-64
+
+For more details check [this](https://docs.conda.io/projects/conda-build/en/latest/resources/compiler-tools.html).
 
 # Referencing
 
