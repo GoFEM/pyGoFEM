@@ -19,7 +19,7 @@ That is it! You should now be able to run the tutorial notebooks.
 
 ### Windows
 
-On Windows, you can use [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl). Note that WSL version 2 or newer is needed. 
+On Windows, you can use [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl) and follow instructions for **Linux** above. *Note* that WSL version **2** or newer is needed. 
 
 ### macOS
 
