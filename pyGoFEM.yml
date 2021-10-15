@@ -27,3 +27,6 @@ dependencies:
   - h5py
   - pyyaml
   - meshio
+  - cmake
+  - boost-cpp
+  - boost
