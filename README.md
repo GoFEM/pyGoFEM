@@ -4,6 +4,12 @@ Python front-end for the **GoFEM** package.
 
 See jupyter notebooks for examples on how to setup GoFEM with python and process the results.
 
+It invokes [https://github.com/MTgeophysics/mtpy](MTPy) for handling MT data. 
+
+# Contributing
+
+If you implement some functions that you think may be of general use, please feel free to create a Pull Request and contribute your code. 
+
 # Installation
 
 ### Linux
