@@ -1,7 +1,7 @@
 '''
     Various auxiliary routines to work with the GoFEM meshes
     
-    Alexander Grayver, 2019 - 2020
+    Alexander Grayver, 2019 - 2021
 '''
 import math
 import numpy as np
@@ -400,7 +400,7 @@ def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radi
         triangulation.execute_coarsening_and_refinement()
             
             
-def project_points_on_interface(triangulation, points, material_id, mapping):
+def project_points_on_interface(triangulation, points, material_top, material_bottom, mapping):
     '''
         Project points to the given material interface. During this
         procedure, only the vertical coordinate of the points is
@@ -412,6 +412,7 @@ def project_points_on_interface(triangulation, points, material_id, mapping):
     dim = triangulation.dim()
     
     projected_points = []
+    projected_points_indices = []
     
     for cell in triangulation.active_cells():
         face_no = 0
@@ -421,14 +422,14 @@ def project_points_on_interface(triangulation, points, material_id, mapping):
                 neighbor_material = cell.neighbor(face_no).material_id
                 
                 if (my_material != neighbor_material) and\
-                   (my_material != material_id) and\
-                   (neighbor_material == material_id):
+                   (my_material == material_bottom) and\
+                   (neighbor_material == material_top):
                     
                     face_v = []
                     for i in range(2**(dim-1)):
                         face_v.append(face.get_vertex(i))
                         
-                    for point in points:
+                    for index, point in enumerate(points):
                         px = point[0]
                         py = point[1]
 
@@ -439,16 +440,24 @@ def project_points_on_interface(triangulation, points, material_id, mapping):
                         if not within:
                             continue
                             
+                        if(index in projected_points_indices):
+                            #raise Exception('Point ' + point + ' already processed.')
+                            continue
+                            
                         p_cell = cell.center(True)
                         p_cell.x = px
                         if dim == 3:
                             p_cell.y = py
-
-                        point_on_face = mapping.project_real_point_to_unit_point_on_face(cell, face_no, p_cell);
-                        projected_points.append(mapping.transform_unit_to_real_cell (cell, point_on_face).to_list());
-
+                            
+                                                    
+                        point_on_face = mapping.project_real_point_to_unit_point_on_face(cell, face_no, p_cell)
+                        projected_points.append(mapping.transform_unit_to_real_cell (cell, point_on_face).to_list())
+                        projected_points_indices.append(index)
             
             face_no += 1
+            
+    # Preserve order of points
+    projected_points = [projected_points[i] for i in projected_points_indices]
             
     return projected_points
 

@@ -50,8 +50,8 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
     elif data_type == 'Tipper':
         str_codes = ['RealTzx', 'ImagTzx', 'RealTzy', 'ImagTzy']
         
-    rho_err_func = lambda z, ze, freq: 2. * abs(z) / (2. * math.pi * freq * mu) * ze;
-    phi_err_func = lambda z, ze: 180. / math.pi * ze / abs(z);
+    rho_err_func = lambda z, ze, freq: 2. * abs(z) / (2. * math.pi * freq * mu) * ze
+    phi_err_func = lambda z, ze: 180. / math.pi * ze / abs(z)
     
     # Convert from [mV/km]/[nT] to Ohm
     factor = (4 * math.pi) / 10000.0
