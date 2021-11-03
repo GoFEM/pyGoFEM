@@ -411,7 +411,7 @@ def project_points_on_interface(triangulation, points, material_top, material_bo
     
     dim = triangulation.dim()
     
-    projected_points = []
+    projected_points = points.copy()
     projected_points_indices = []
     
     for cell in triangulation.active_cells():
@@ -448,16 +448,12 @@ def project_points_on_interface(triangulation, points, material_top, material_bo
                         p_cell.x = px
                         if dim == 3:
                             p_cell.y = py
-                            
-                                                    
+                                                                                
                         point_on_face = mapping.project_real_point_to_unit_point_on_face(cell, face_no, p_cell)
-                        projected_points.append(mapping.transform_unit_to_real_cell (cell, point_on_face).to_list())
+                        projected_points[index] = mapping.transform_unit_to_real_cell (cell, point_on_face).to_list()
                         projected_points_indices.append(index)
             
             face_no += 1
-            
-    # Preserve order of points
-    projected_points = [projected_points[i] for i in projected_points_indices]
             
     return projected_points
 
