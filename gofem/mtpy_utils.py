@@ -15,12 +15,16 @@ from mtpy.core.edi_collection import EdiCollection
 
 from gofem.data_utils import *
 
-def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = None, error_floor = 0.05, data_type = 'Z', period_range = [-math.inf, math.inf]):
+def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = None,\
+                                  error_floor = 0.05, data_type = 'Z',\
+                                  period_range = [-math.inf, math.inf],\
+                                  error_floor_type = 'rowwise'):
     '''
         Write down MT impdeance tensors from the edi collection 
         to the GoFEM data file with the given error floor.
         
-        Error floor is applied to the impdeance (or derived) row-wise.
+        Error floor is applied to the impdeance (or derived quantities) 
+        row-wise or by taking the geometric mean of Zxy and Zyx.
         
         @p data_type can take several values:
         'Z' -- write full impedance
@@ -49,6 +53,8 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
         str_codes = ['RhoZxy', 'RhoZyx', 'PhsZxy', 'PhsZyx']
     elif data_type == 'Tipper':
         str_codes = ['RealTzx', 'ImagTzx', 'RealTzy', 'ImagTzy']
+    else:
+        raise RuntimeError('Unsupported data type')
         
     rho_err_func = lambda z, ze, freq: 2. * abs(z) / (2. * math.pi * freq * mu) * ze
     phi_err_func = lambda z, ze: 180. / math.pi * ze / abs(z)
@@ -67,9 +73,11 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
                 
                 if f_index_list.size == 0:
                     all_frequencies.append(freq)
-    else:
+    elif edi_collection is not None:
         all_frequencies = edi_collection.all_frequencies
         mt_objects = edi_collection.mt_obj_list
+    else:
+        raise RuntimeError('Provide EDI collection or list of MT objects')
     
     for freq in all_frequencies:
         
@@ -96,8 +104,13 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
             tobj = mt_obj.Tipper
             ptobj = mt_obj.pt
             
-            dZxy = max([zobj.z_err[p_index, 0, 1], error_floor * abs(zobj.z[p_index, 0, 1])]) * factor
-            dZyx = max([zobj.z_err[p_index, 1, 0], error_floor * abs(zobj.z[p_index, 1, 0])]) * factor
+            if(error_floor_type == 'rowwise'):
+                dZxy = max([zobj.z_err[p_index, 0, 1], error_floor * abs(zobj.z[p_index, 0, 1])]) * factor
+                dZyx = max([zobj.z_err[p_index, 1, 0], error_floor * abs(zobj.z[p_index, 1, 0])]) * factor
+            elif(error_floor_type == 'offdiag'):
+                Z_mean = np.sqrt(np.abs(zobj.z[p_index, 0, 1]*zobj.z[p_index, 1, 0]))
+                dZxy = max([zobj.z_err[p_index, 0, 1], error_floor * Z_mean]) * factor
+                dZyx = max([zobj.z_err[p_index, 1, 0], error_floor * Z_mean]) * factor
                         
             if data_type == 'Z_offdiag' or data_type == 'Z':
                 mt_data.append([str_codes[0], freq, mt_obj.station, zobj.z[p_index, 0, 1].real * factor, dZxy])
