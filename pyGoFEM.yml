@@ -1,7 +1,6 @@
 name: pygofem
 channels:
   - conda-forge
-  - defaults
 dependencies:
   - python=3.8
   - ipywidgets
@@ -26,7 +25,6 @@ dependencies:
   - paraview
   - h5py
   - pyyaml
-  - meshio
   - cmake
   - boost-cpp
   - boost
