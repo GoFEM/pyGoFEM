@@ -111,6 +111,10 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
                 Z_mean = np.sqrt(np.abs(zobj.z[p_index, 0, 1]*zobj.z[p_index, 1, 0]))
                 dZxy = max([zobj.z_err[p_index, 0, 1], error_floor * Z_mean]) * factor
                 dZyx = max([zobj.z_err[p_index, 1, 0], error_floor * Z_mean]) * factor
+                
+            dZ = np.zeros(shape=(2,2))
+            dZ[0,:] = dZxy
+            dZ[1,:] = dZyx
                         
             if data_type == 'Z_offdiag' or data_type == 'Z':
                 mt_data.append([str_codes[0], freq, mt_obj.station, zobj.z[p_index, 0, 1].real * factor, dZxy])
@@ -125,16 +129,16 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
                     mt_data.append([str_codes[7], freq, mt_obj.station, zobj.z[p_index, 1, 1].imag * factor, dZyx])
                                    
             elif data_type == 'RP_offdiag' or data_type == 'RP':
-                mt_data.append([str_codes[0], freq, mt_obj.station, zobj.resistivity[p_index, 0, 1], zobj.resistivity_err[p_index, 0, 1]])
-                mt_data.append([str_codes[1], freq, mt_obj.station, zobj.resistivity[p_index, 1, 0], zobj.resistivity_err[p_index, 1, 0]])
-                mt_data.append([str_codes[2], freq, mt_obj.station, zobj.phase[p_index, 0, 1], zobj.phase_err[p_index, 0, 1]])
-                mt_data.append([str_codes[3], freq, mt_obj.station, zobj.phase[p_index, 1, 0], zobj.phase_err[p_index, 1, 0]])
+                mt_data.append([str_codes[0], freq, mt_obj.station, zobj.resistivity[p_index, 0, 1], rho_err_func(zobj.z[p_index, 0, 1], dZxy, freq)])
+                mt_data.append([str_codes[1], freq, mt_obj.station, zobj.resistivity[p_index, 1, 0], rho_err_func(zobj.z[p_index, 1, 0], dZyx, freq)])
+                mt_data.append([str_codes[2], freq, mt_obj.station, zobj.phase[p_index, 0, 1], phase_err(zobj.z[p_index, 0, 1], dZxy)])
+                mt_data.append([str_codes[3], freq, mt_obj.station, zobj.phase[p_index, 1, 0], phase_err(zobj.z[p_index, 1, 0], dZyx)])
                 
                 if data_type == 'RP':
-                    mt_data.append([str_codes[4], freq, mt_obj.station, zobj.resistivity[p_index, 0, 0], zobj.resistivity_err[p_index, 0, 0]])
-                    mt_data.append([str_codes[5], freq, mt_obj.station, zobj.resistivity[p_index, 1, 1], zobj.resistivity_err[p_index, 1, 1]])
-                    mt_data.append([str_codes[6], freq, mt_obj.station, zobj.phase[p_index, 0, 0], zobj.phase_err[p_index, 0, 0]])
-                    mt_data.append([str_codes[7], freq, mt_obj.station, zobj.phase[p_index, 1, 1], zobj.phase_err[p_index, 1, 1]])
+                    mt_data.append([str_codes[4], freq, mt_obj.station, zobj.resistivity[p_index, 0, 0], rho_err_func(zobj.z[p_index, 0, 0], dZxy, freq)])
+                    mt_data.append([str_codes[5], freq, mt_obj.station, zobj.resistivity[p_index, 1, 1], rho_err_func(zobj.z[p_index, 1, 1], dZyx, freq)])
+                    mt_data.append([str_codes[6], freq, mt_obj.station, zobj.phase[p_index, 0, 0], phase_err(zobj.z[p_index, 0, 0], dZxy)])
+                    mt_data.append([str_codes[7], freq, mt_obj.station, zobj.phase[p_index, 1, 1], phase_err(zobj.z[p_index, 1, 1], dZyx)])
                     
             elif data_type == 'Tipper':
                 mt_data.append([str_codes[0], freq, mt_obj.station, tobj.tipper[p_index, 0, 0].real, max(tobj.tipper_err[p_index, 0, 0], error_floor)])
@@ -143,10 +147,12 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
                 mt_data.append([str_codes[3], freq, mt_obj.station, tobj.tipper[p_index, 0, 1].imag, max(tobj.tipper_err[p_index, 0, 1], error_floor)])
 
             elif data_type == 'PT':
-                mt_data.append([str_codes[0], freq, mt_obj.station, ptobj.pt[p_index, 0, 0].real, ptobj.pt_err[p_index, 0, 0]])
-                mt_data.append([str_codes[1], freq, mt_obj.station, ptobj.pt[p_index, 0, 1].imag, ptobj.pt_err[p_index, 0, 1]])
-                mt_data.append([str_codes[2], freq, mt_obj.station, ptobj.pt[p_index, 1, 0].real, ptobj.pt_err[p_index, 1, 0]])
-                mt_data.append([str_codes[3], freq, mt_obj.station, ptobj.pt[p_index, 1, 1].imag, ptobj.pt_err[p_index, 1, 1]])
+                PT, dPT = calculate_phase_tensor(zobj.z[p_index] * factor, dZ)
+                
+                mt_data.append([str_codes[0], freq, mt_obj.station, ptobj.pt[p_index, 0, 0].real, dPT[0, 0]])
+                mt_data.append([str_codes[1], freq, mt_obj.station, ptobj.pt[p_index, 0, 1].real, dPT[0, 1]])
+                mt_data.append([str_codes[2], freq, mt_obj.station, ptobj.pt[p_index, 1, 0].real, dPT[1, 0]])
+                mt_data.append([str_codes[3], freq, mt_obj.station, ptobj.pt[p_index, 1, 1].real, dPT[1, 1]])
     
     with open(outfile, 'w') as f:
         f.write('# DataType Frequency Source Receiver Value Error\n')

@@ -121,3 +121,82 @@ def read_inversion_responses(datafile):
     
     df = pd.DataFrame()
     df = pd.read_csv(file_format % frequencies[fidx], sep="\t")
+    
+    
+def calculate_phase_tensor(Z, dZ = None):
+    
+    PT = np.zeros(shape=(2,2))
+    dPT = np.zeros(shape=(2,2))
+    
+    #PT = np.linalg.inv(Z.real) * Z.imag
+    detX = Z[0,0].real*Z[1,1].real - Z[1,0].real*Z[0,1].real
+
+    PT[0, 0] = Z.real[1, 1] * Z.imag[0, 0] - Z.real[0, 1] * Z.imag[1, 0]
+    PT[0, 1] = Z.real[1, 1] * Z.imag[0, 1] - Z.real[0, 1] * Z.imag[1, 1]
+    PT[1, 0] = Z.real[0, 0] * Z.imag[1, 0] - Z.real[1, 0] * Z.imag[0, 0]
+    PT[1, 1] = Z.real[0, 0] * Z.imag[1, 1] - Z.real[1, 0] * Z.imag[0, 1]
+
+    PT /= detX
+        
+    if dZ is None:
+        return PT
+    else:
+        dPT = np.zeros(shape=(2,2))
+        
+        dPTdX = np.zeros(shape=(2, 2, 2, 2))
+        dPTdY = np.zeros(shape=(2, 2, 2, 2))
+
+        # dPTxx
+        dPTdX[0,0,0,0] =(-PT[0,0] * Z[1,1].real) / detX;
+        dPTdX[0,0,0,1] =( PT[0,0] * Z[1,0].real - Z[1,0].imag) / detX;
+        dPTdX[0,0,1,0] =( PT[0,0] * Z[0,1].real) / detX;
+        dPTdX[0,0,1,1] =(-PT[0,0] * Z[0,0].real + Z[0,0].imag) / detX;
+
+        dPTdY[0,0,0,0] = Z[1,1].real / detX;
+        dPTdY[0,0,0,1] = 0;
+        dPTdY[0,0,1,0] =-Z[0,1].real / detX;
+        dPTdY[0,0,1,1] = 0;
+
+        # dPTxy
+        dPTdX[0,1,0,0] = (-PT[0,1] * Z[1,1].real) / detX;
+        dPTdX[0,1,0,1] = ( PT[0,1] * Z[1,0].real - Z[1,1].imag) / detX;
+        dPTdX[0,1,1,0] = ( PT[0,1] * Z[0,1].real) / detX;
+        dPTdX[0,1,1,1] = (-PT[0,1] * Z[0,0].real + Z[0,1].imag) / detX;
+
+        dPTdY[0,1,0,0] = 0;
+        dPTdY[0,1,0,1] = Z[1,1].real / detX;
+        dPTdY[0,1,1,0] = 0;
+        dPTdY[0,1,1,1] =-Z[0,1].real / detX;
+
+        # dPTyx
+        dPTdX[1][0,0][0] = (-PT[1,0] * Z[1,1].real + Z[1,0].imag) / detX;
+        dPTdX[1][0,0][1] = ( PT[1,0] * Z[1,0].real) / detX;
+        dPTdX[1,0][1,0] = ( PT[1,0] * Z[0,1].real - Z[0,0].imag) / detX;
+        dPTdX[1,0][1,1] = (-PT[1,0] * Z[0,0].real) / detX;
+
+        dPTdY[1][0,0][0] =-Z[1,0].real / detX;
+        dPTdY[1][0,0][1] = 0;
+        dPTdY[1,0][1,0] = Z[0,0].real / detX;
+        dPTdY[1,0][1,1] = 0;
+
+        # dPTyy
+        dPTdX[1,1][0,0] = (-PT[1,1] * Z[1,1].real + Z[1,1].imag) /  detX;
+        dPTdX[1,1][0,1] = ( PT[1,1] * Z[1,0].real) / detX;
+        dPTdX[1,1][1,0] = ( PT[1,1] * Z[0,1].real - Z[0,1].imag) / detX;
+        dPTdX[1,1][1,1] = (-PT[1,1] * Z[0,0].real) / detX;
+
+        dPTdY[1,1][0,0] = 0;
+        dPTdY[1,1][0,1] =-Z[1,0].real / detX;
+        dPTdY[1,1][1,0] = 0;
+        dPTdY[1,1][1,1] = Z[0,0].real / detX;
+
+        for k in range(2):
+            for l in range(2):
+                propagated_error = 0
+                for i in range(2):
+                    for j in range(2):
+                        propagated_error += (dPTdY[k,l,i,j] ** 2.)*(dZ[i,j] ** 2.) + (dPTdX[k,l,i,j] ** 2.)*(dZ[i,j] ** 2.)
+
+                dPT[k, l] = np.sqrt(propagated_error)
+        
+        return PT, dPT
