@@ -131,14 +131,14 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
             elif data_type == 'RP_offdiag' or data_type == 'RP':
                 mt_data.append([str_codes[0], freq, mt_obj.station, zobj.resistivity[p_index, 0, 1], rho_err_func(zobj.z[p_index, 0, 1], dZxy, freq)])
                 mt_data.append([str_codes[1], freq, mt_obj.station, zobj.resistivity[p_index, 1, 0], rho_err_func(zobj.z[p_index, 1, 0], dZyx, freq)])
-                mt_data.append([str_codes[2], freq, mt_obj.station, zobj.phase[p_index, 0, 1], phase_err(zobj.z[p_index, 0, 1], dZxy)])
-                mt_data.append([str_codes[3], freq, mt_obj.station, zobj.phase[p_index, 1, 0], phase_err(zobj.z[p_index, 1, 0], dZyx)])
+                mt_data.append([str_codes[2], freq, mt_obj.station, zobj.phase[p_index, 0, 1], phi_err_func(zobj.z[p_index, 0, 1], dZxy)])
+                mt_data.append([str_codes[3], freq, mt_obj.station, zobj.phase[p_index, 1, 0], phi_err_func(zobj.z[p_index, 1, 0], dZyx)])
                 
                 if data_type == 'RP':
                     mt_data.append([str_codes[4], freq, mt_obj.station, zobj.resistivity[p_index, 0, 0], rho_err_func(zobj.z[p_index, 0, 0], dZxy, freq)])
                     mt_data.append([str_codes[5], freq, mt_obj.station, zobj.resistivity[p_index, 1, 1], rho_err_func(zobj.z[p_index, 1, 1], dZyx, freq)])
-                    mt_data.append([str_codes[6], freq, mt_obj.station, zobj.phase[p_index, 0, 0], phase_err(zobj.z[p_index, 0, 0], dZxy)])
-                    mt_data.append([str_codes[7], freq, mt_obj.station, zobj.phase[p_index, 1, 1], phase_err(zobj.z[p_index, 1, 1], dZyx)])
+                    mt_data.append([str_codes[6], freq, mt_obj.station, zobj.phase[p_index, 0, 0], phi_err_func(zobj.z[p_index, 0, 0], dZxy)])
+                    mt_data.append([str_codes[7], freq, mt_obj.station, zobj.phase[p_index, 1, 1], phi_err_func(zobj.z[p_index, 1, 1], dZyx)])
                     
             elif data_type == 'Tipper':
                 mt_data.append([str_codes[0], freq, mt_obj.station, tobj.tipper[p_index, 0, 0].real, max(tobj.tipper_err[p_index, 0, 0], error_floor)])
