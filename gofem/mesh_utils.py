@@ -195,7 +195,7 @@ def alpha_shape(points, alpha):
     triangles = list(polygonize(m))
     return cascaded_union(triangles), edge_points
 
-def refine_at_interface(triangulation, material_ids, repeat = 1, center = None, radii = None, pnorm = 2):
+def refine_at_interface(triangulation, material_ids, repeat = 1, center = None, radii = None, pnorm = 2, refine_flag = 'isotropic'):
     '''
         Refine cells with provided material ids in triangulation that neighbor cells with
         other ids. Repeat several times if requested. Only cells that are within
@@ -218,12 +218,12 @@ def refine_at_interface(triangulation, material_ids, repeat = 1, center = None, 
                 if not face.at_boundary():
                     neighbor = cell.neighbor(n)
                     if not neighbor.material_id in material_ids:
-                        cell.refine_flag = 'isotropic'
+                        cell.refine_flag = refine_flag
                             
         triangulation.execute_coarsening_and_refinement()
         
         
-def refine_around_points(triangulation, points, center, radii, repeat = 1, exclude_materials = [], pnorm = 2):
+def refine_around_points(triangulation, points, center, radii, repeat = 1, exclude_materials = [], pnorm = 2, refine_flag = 'isotropic'):
     '''
         Refine cells around points Repeat several times if requested. 
         Only cells that are within a given radii are refined.
@@ -239,7 +239,7 @@ def refine_around_points(triangulation, points, center, radii, repeat = 1, exclu
             center = cell.center().to_list()
             for point in points:
                 if is_within_ellipsoid(point, center, radii, pnorm):
-                    cell.refine_flag = 'isotropic'
+                    cell.refine_flag = refine_flag
                     
         triangulation.execute_coarsening_and_refinement()
         
@@ -264,10 +264,9 @@ def points_in_polygon(points_xy, polygon, quadrat_width):
     import osmnx as ox
     import geopandas as gpd
     import pandas as pd
-    from shapely.geometry import Polygon, MultiPolygon, Point
+    from shapely.geometry import Point
     
     gdf_nodes = gpd.GeoDataFrame(data={'x':points_xy[0], 'y':points_xy[1]})
-    gdf_nodes.name = 'nodes'
     gdf_nodes['geometry'] = gdf_nodes.apply(lambda row: Point((row['x'], row['y'])), axis=1)
     
     geometry_cut = ox.utils_geo._quadrat_cut_geometry(polygon, quadrat_width=quadrat_width)
@@ -288,9 +287,9 @@ def points_in_polygon(points_xy, polygon, quadrat_width):
         precise_matches = possible_matches[possible_matches.intersects(poly)]
         points_within = points_within.append(precise_matches)
 
-    points_outside = gdf_nodes[~gdf_nodes.isin(points_within)]
+    #points_outside = gdf_nodes[~gdf_nodes.isin(points_within)]
     
-    return points_within, points_outside
+    return points_within
 
 
 def refine_within_polygon(triangulation, polygon, repeat = 1, z_range = [float('-inf'), float('inf')], n_quadrats = 10):
@@ -320,8 +319,11 @@ def refine_within_polygon(triangulation, polygon, repeat = 1, z_range = [float('
                 yc.append(center[1])
                 cell_indices[(cell.level(), cell.index())] = idx
                 idx += 1
+                
+        if(len(yc) == 0):
+            continue
         
-        points_in, points_out = points_in_polygon([xc, yc], polygon, quadrat_width = qwidth)
+        points_in = points_in_polygon([xc, yc], polygon, quadrat_width = qwidth)
                 
         for cell in triangulation.active_cells():
             if (cell.level(), cell.index()) in cell_indices.keys() and\
@@ -368,7 +370,7 @@ def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radi
                         cell_indices[(neighbor.level(), neighbor.index())] = idx
                         idx += 1
         
-        points_in, points_out = points_in_polygon([xc, yc], polygon, quadrat_width = qwidth)
+        points_in = points_in_polygon([xc, yc], polygon, quadrat_width = qwidth)
         
         for cell in triangulation.active_cells():
             if cell.material_id == material_id:
