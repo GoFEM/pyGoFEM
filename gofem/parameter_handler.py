@@ -63,7 +63,8 @@ class ParameterHandler:
                                     'Background model definition file': '',\
                                     'Background materials definition file': '',\
                                     'Active domain box': [0,0,0,0,0,0],\
-                                    'Active domain mask': ''}
+                                    'Active domain mask': '',\
+                                    'Cell weights': ''}
             
         self.parameters['Survey'] = {'Frequencies file': '',\
                                     'Times file': '',\
