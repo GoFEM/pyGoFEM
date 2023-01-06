@@ -279,7 +279,7 @@ def points_in_polygon(points_xy, polygon, quadrat_width):
     for poly in geometry_cut:
         # buffer by the <1 micron dist to account for any space lost in the quadrat cutting
         # otherwise may miss point(s) that lay directly on quadrat line
-        poly = poly.buffer(1e-14).buffer(0)
+        poly = poly.buffer(1e-6).buffer(0)
 
         # find approximate matches with r-tree, then precise matches from those approximate ones
         possible_matches_index = list(sindex.intersection(poly.bounds))
@@ -300,10 +300,8 @@ def refine_within_polygon(triangulation, polygon, repeat = 1, z_range = [float('
     import shapely.geometry
     
     dim = triangulation.dim()
-    
-    assert dim == 3
 
-    qwidth = (polygon.bounds[2] - polygon.bounds[0]) / n_quadrats
+    qwidth = (polygon.bounds[dim-1] - polygon.bounds[0]) / n_quadrats
     
     for i in range(repeat):
         
@@ -340,10 +338,8 @@ def refine_at_polygon_boundary(triangulation, polygon, material_id, center, radi
     import shapely.geometry
     
     dim = triangulation.dim()
-    
-    assert dim == 3
 
-    qwidth = (polygon.bounds[2] - polygon.bounds[0]) / n_quadrats
+    qwidth = (polygon.bounds[dim-1] - polygon.bounds[0]) / n_quadrats
     
     for i in range(repeat):
         

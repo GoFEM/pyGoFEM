@@ -18,23 +18,24 @@ def read_modeling_responses_bin(file_format, frequencies):
 
             if fidx == 0:
                 coords = data[:,0:3]
+                weights = data[:,27]
                 
                 E = np.zeros(shape=(n_frequencies,data.shape[0], 3), dtype=np.complex128)
                 H = np.zeros(shape=(n_frequencies,data.shape[0], 3), dtype=np.complex128)
                 Ep = np.zeros(shape=(n_frequencies,data.shape[0], 3), dtype=np.complex128)
                 Hp = np.zeros(shape=(n_frequencies,data.shape[0], 3), dtype=np.complex128)
                 
-            E.real = data[:,[3,5,7]]
-            E.imag = data[:,[4,6,8]]
-            H.real = data[:,[9,11,13]]
-            H.imag = data[:,[10,12,14]]
+            E[fidx].real = data[:,[3,5,7]]
+            E[fidx].imag = data[:,[4,6,8]]
+            H[fidx].real = data[:,[9,11,13]]
+            H[fidx].imag = data[:,[10,12,14]]
 
-            Ep.real = data[:,[15,17,19]]
-            Ep.imag = data[:,[16,18,20]]
-            Hp.real = data[:,[21,23,25]]
-            Hp.imag = data[:,[22,24,26]]
+            Ep[fidx].real = data[:,[15,17,19]]
+            Ep[fidx].imag = data[:,[16,18,20]]
+            Hp[fidx].real = data[:,[21,23,25]]
+            Hp[fidx].imag = data[:,[22,24,26]]
             
-    return coords, E, H, Ep, Hp
+    return coords, E, H, Ep, Hp, weights
 
 def calculate_MT_impedance(E1, H1, E2, H2, omega):
     
