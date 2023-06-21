@@ -26,5 +26,5 @@ dependencies:
   - h5py
   - pyyaml
   - cmake
-  - boost-cpp
-  - boost
+  - boost-cpp=1.74
+  - boost=1.74
