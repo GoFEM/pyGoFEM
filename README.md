@@ -14,6 +14,12 @@ If you implement some functions that you think may be of general use, please fee
 
 ### Linux
 
+If you do not have conda, first install it, for example by executing this:
+```
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh 
+sh Miniconda3-latest-Linux-x86_64.sh
+```
+
 It is easiest to setup the pyGoFEM via [conda](https://docs.conda.io/en/latest/). Just deploy the environment using the environment file *pyGoFEM.yml* as:
 
 ```
