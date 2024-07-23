@@ -1,26 +1,26 @@
 '''
     Various auxiliary routines to work with the MTpy for GoFEM
     
-    Alexander Grayver, 2020
+    Alexander Grayver, 2020 - 2024
 '''
 import math
+import sys
 import numpy as np
 import pandas as pd
 
-import mtpy.analysis.pt as pt
-from mtpy.core import mt as mt
-from mtpy.core import z as mtz
+import mtpy.core.transfer_function.pt as pt
+import mtpy.core.transfer_function.z as mtz
 
-from mtpy.core.edi_collection import EdiCollection
+from mtpy import MT, MTCollection, MTData
 
 from gofem.data_utils import *
 
-def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = None,\
+def write_mt_collection_to_gofem(outfile, mt_collection = None, mt_objects = None,\
                                   error_floor = 0.05, data_type = 'Z',\
                                   period_range = [-math.inf, math.inf],\
                                   error_floor_type = 'rowwise'):
     '''
-        Write down MT impdeance tensors from the edi collection 
+        Write down MT impdeance tensors from the mt collection
         to the GoFEM data file with the given error floor.
         
         Error floor is applied to the impdeance (or derived quantities) 
@@ -66,16 +66,21 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
         all_frequencies = []
         
         for mt_obj in mt_objects:
-            for freq in mt_obj.Z.freq:
+            for freq in mt_obj.Z.frequency:
                 freq_max = freq * (1 + ptol)
                 freq_min = freq * (1 - ptol)
                 f_index_list = np.where((all_frequencies < freq_max) & (all_frequencies > freq_min))[0]    
                 
                 if f_index_list.size == 0:
                     all_frequencies.append(freq)
-    elif edi_collection is not None:
-        all_frequencies = edi_collection.all_frequencies
-        mt_objects = edi_collection.mt_obj_list
+    elif mt_collection is not None:
+        all_frequencies = np.reciprocal(mt_collection.to_mt_data().get_periods())
+
+        mt_objects = []
+        all_stations = list(mt_collection.dataframe['station'])
+
+        for station in all_stations:
+            mt_objects.append(mt_collection.get_tf(station))
     else:
         raise RuntimeError('Provide EDI collection or list of MT objects')
     
@@ -88,7 +93,7 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
         for mt_obj in mt_objects:
             freq_max = freq * (1 + ptol)
             freq_min = freq * (1 - ptol)
-            f_index_list = np.where((mt_obj.Z.freq < freq_max) & (mt_obj.Z.freq > freq_min))[0]
+            f_index_list = np.where((mt_obj.Z.frequency < freq_max) & (mt_obj.Z.frequency > freq_min))[0]
             
             #print(f_index_list, freq_max, freq_min, len(f_index_list), type(f_index_list))
             
@@ -105,12 +110,12 @@ def write_edi_collection_to_gofem(outfile, edi_collection = None, mt_objects = N
             ptobj = mt_obj.pt
             
             if(error_floor_type == 'rowwise'):
-                dZxy = max([zobj.z_err[p_index, 0, 1], error_floor * abs(zobj.z[p_index, 0, 1])]) * factor
-                dZyx = max([zobj.z_err[p_index, 1, 0], error_floor * abs(zobj.z[p_index, 1, 0])]) * factor
+                dZxy = max([zobj.z_error[p_index, 0, 1], error_floor * abs(zobj.z[p_index, 0, 1])]) * factor
+                dZyx = max([zobj.z_error[p_index, 1, 0], error_floor * abs(zobj.z[p_index, 1, 0])]) * factor
             elif(error_floor_type == 'offdiag'):
                 Z_mean = np.sqrt(np.abs(zobj.z[p_index, 0, 1]*zobj.z[p_index, 1, 0]))
-                dZxy = max([zobj.z_err[p_index, 0, 1], error_floor * Z_mean]) * factor
-                dZyx = max([zobj.z_err[p_index, 1, 0], error_floor * Z_mean]) * factor
+                dZxy = max([zobj.z_error[p_index, 0, 1], error_floor * Z_mean]) * factor
+                dZyx = max([zobj.z_error[p_index, 1, 0], error_floor * Z_mean]) * factor
                 
             dZ = np.zeros(shape=(2,2))
             dZ[0,:] = dZxy
@@ -179,47 +184,33 @@ def read_gofem_modelling_output(fileformat, frequency_list, station_list, statio
     # Conversion factor from Ohm to [mV/km]/[nT]
     factor = 10000.0 / (4 * math.pi)
     
-    data_dict = {}
+    Z_data_dict = {}
+    T_data_dict = {}
     for station, xyz in zip(station_list, station_coords):
-        data_dict[station] = mt.MT()
-        data_dict[station].Z = mtz.Z(z_array=z_dummy.copy(),
-                                     z_err_array=z_dummy.copy().real,
-                                     freq=np.array(frequency_list))
-        data_dict[station].Tipper = mtz.Tipper(tipper_array=t_dummy.copy(),
-                                               tipper_err_array=t_dummy.copy().real,
-                                               freq=np.array(frequency_list))
-        
-        data_dict[station].station = station
-        #data_dict[station].east = xyz[1]
-        #data_dict[station].north = xyz[0]
-        #data_dict[station].elev = -xyz[2]
-        
+        Z_data_dict[station] = z_dummy.copy()
+        T_data_dict[station] = t_dummy.copy()
+
     for fidx in range(len(frequency_list)):
         for index, row in dfs[fidx].iterrows():
-            if row['Receiver'] not in data_dict.keys():
+            if row['Receiver'] not in Z_data_dict.keys():
                 raise Exception('Station', row['Receiver'], ' is not in the station list.')
                 
             station = row['Receiver']
             
-            data_dict[station].Z.z[fidx, 0, 0] = row['Zxx']
-            data_dict[station].Z.z[fidx, 0, 1] = row['Zxy']
-            data_dict[station].Z.z[fidx, 1, 0] = row['Zyx']
-            data_dict[station].Z.z[fidx, 1, 1] = row['Zyy']
+            Z_data_dict[station][fidx, 0, 0] = row['Zxx'] * factor
+            Z_data_dict[station][fidx, 0, 1] = row['Zxy'] * factor
+            Z_data_dict[station][fidx, 1, 0] = row['Zyx'] * factor
+            Z_data_dict[station][fidx, 1, 1] = row['Zyy'] * factor
             
-            data_dict[station].Tipper.tipper[fidx, 0, 0] = row['Tzx']
-            data_dict[station].Tipper.tipper[fidx, 0, 1] = row['Tzy']
+            T_data_dict[station][fidx, 0, 0] = row['Tzx']
+            T_data_dict[station][fidx, 0, 1] = row['Tzy']
             
     mt_obj_list = []
-    mu0 = 4. * np.pi * 1e-7
-    for station, mt_obj in data_dict.items():
-        
-        mt_obj.Z.z *= factor
-        
-        mt_obj.Z.compute_resistivity_phase()
-        mt_obj.pt.set_z_object(mt_obj.Z)
-        mt_obj.Tipper.compute_amp_phase()
-        mt_obj.Tipper.compute_mag_direction()
-        
+    for station in Z_data_dict.keys():
+        mt_obj = MT(station = station, survey = 'Modelling', frequency = np.array(frequency_list),
+                    impedance=Z_data_dict[station], impedance_error=z_dummy.copy().real,
+                    tipper=T_data_dict[station], tipper_error=t_dummy.copy().real)
+
         mt_obj_list.append(mt_obj)
     
     return mt_obj_list
@@ -235,9 +226,6 @@ def read_gofem_inversion_output(data_file):
     all_frequencies = df['frequency'].unique()
     stations = df['station'].unique()
 
-    z_dummy = np.zeros((len(all_frequencies), 2, 2), dtype='complex')
-    t_dummy = np.zeros((len(all_frequencies), 1, 2), dtype='complex')
-
     ptol = 0.03
 
     # Conversion factor from Ohm to [mV/km]/[nT]
@@ -247,16 +235,12 @@ def read_gofem_inversion_output(data_file):
     for station in stations:
         dfs = df[df['station'] == station]
     
-        mt_obj = mt.MT()
-        mt_obj.Z = mtz.Z(z_array=z_dummy.copy(),
-                         z_err_array=z_dummy.copy().real,
-                         freq=np.array(all_frequencies))
-        mt_obj.Tipper = mtz.Tipper(tipper_array=t_dummy.copy(),
-                                   tipper_err_array=t_dummy.copy().real,
-                                   freq=np.array(all_frequencies))
-        
-        mt_obj.station = station
-    
+        z = np.zeros((len(all_frequencies), 2, 2), dtype='complex')
+        z_err = np.zeros((len(all_frequencies), 2, 2))
+
+        tipper = np.zeros((len(all_frequencies), 1, 2), dtype='complex')
+        tipper_err = np.zeros((len(all_frequencies), 1, 2))
+            
         for n, frequency in enumerate(all_frequencies):
             freq_max = frequency * (1 + ptol)
             freq_min = frequency * (1 - ptol)
@@ -271,46 +255,44 @@ def read_gofem_inversion_output(data_file):
             if 'RealZxx' in dfs_freq.index and 'ImagZxx' in dfs_freq.index:
                 Zxx = complex(dfs_freq.loc['RealZxx'].value, 
                               dfs_freq.loc['ImagZxx'].value)
-                mt_obj.Z.z[n, 0, 0] = Zxx
-                mt_obj.Z.z_err[n, 0, 0] = dfs_freq.loc['RealZxx'].std_error
+                z[n, 0, 0] = Zxx
+                z_err[n, 0, 0] = dfs_freq.loc['RealZxx'].std_error
             
             if 'RealZxy' in dfs_freq.index and 'ImagZxy' in dfs_freq.index:
                 Zxy = complex(dfs_freq.loc['RealZxy'].value, 
                               dfs_freq.loc['ImagZxy'].value)
-                mt_obj.Z.z[n, 0, 1] = Zxy
-                mt_obj.Z.z_err[n, 0, 1] = dfs_freq.loc['RealZxy'].std_error
+                z[n, 0, 1] = Zxy
+                z_err[n, 0, 1] = dfs_freq.loc['RealZxy'].std_error
             
             if 'RealZyx' in dfs_freq.index and 'ImagZyx' in dfs_freq.index:
                 Zyx = complex(dfs_freq.loc['RealZyx'].value, 
                               dfs_freq.loc['ImagZyx'].value)
-                mt_obj.Z.z[n, 1, 0] = Zyx
-                mt_obj.Z.z_err[n, 1, 0] = dfs_freq.loc['RealZyx'].std_error
+                z[n, 1, 0] = Zyx
+                z_err[n, 1, 0] = dfs_freq.loc['RealZyx'].std_error
             
             if 'RealZyy' in dfs_freq.index and 'ImagZyy' in dfs_freq.index:
                 Zyy = complex(dfs_freq.loc['RealZyy'].value, 
                               dfs_freq.loc['ImagZyy'].value)
-                mt_obj.Z.z[n, 1, 1] = Zyy
-                mt_obj.Z.z_err[n, 1, 1] = dfs_freq.loc['RealZyy'].std_error
+                z[n, 1, 1] = Zyy
+                z_err[n, 1, 1] = dfs_freq.loc['RealZyy'].std_error
             
             if 'RealTzy' in dfs_freq.index and 'ImagTzy' in dfs_freq.index:
                 Tzy = complex(dfs_freq.loc['RealTzy'].value, 
                               dfs_freq.loc['ImagTzy'].value)
-                mt_obj.Tipper.tipper[n, 0, 1] = Tzy
-                mt_obj.Tipper.tipper_err[n, 0, 1] = dfs_freq.loc['RealTzy'].std_error
+                tipper[n, 0, 1] = Tzy
+                tipper_err[n, 0, 1] = dfs_freq.loc['RealTzy'].std_error
             
             if 'RealTzx' in dfs_freq.index and 'ImagTzx' in dfs_freq.index:
                 Tzx = complex(dfs_freq.loc['RealTzx'].value, 
                               dfs_freq.loc['ImagTzx'].value)
-                mt_obj.Tipper.tipper[n, 0, 0] = Tzx
-                mt_obj.Tipper.tipper_err[n, 0, 0] = dfs_freq.loc['RealTzx'].std_error
+                tipper[n, 0, 0] = Tzx
+                tipper_err[n, 0, 0] = dfs_freq.loc['RealTzx'].std_error
             
-        mt_obj.Z.z *= factor
-        mt_obj.Z.z_err *= factor
+        z *= factor
+        z_err *= factor
         
-        mt_obj.Z.compute_resistivity_phase()
-        mt_obj.pt.set_z_object(mt_obj.Z)
-        mt_obj.Tipper.compute_amp_phase()
-        mt_obj.Tipper.compute_mag_direction()
+        mt_obj = MT(station = station, survey = 'Modelling', frequency = all_frequencies,
+                    impedance=z, impedance_error=z_err, tipper=tipper, tipper_error=tipper_err)
 
         mt_obj_list.append(mt_obj)
         
@@ -320,7 +302,7 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
     
     frequencies_mod = np.array([])
     for mt_obj_modelled in mt_mod_list:
-        for frequency in mt_obj_modelled.Z.freq:
+        for frequency in mt_obj_modelled.Z.frequency:
             freq_max = frequency * (1 + ftol)
             freq_min = frequency * (1 - ftol)
             
@@ -355,14 +337,14 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
             freq_max = frequency * (1 + ftol)
             freq_min = frequency * (1 - ftol)
         
-            fidx_obs = np.where((mt_obj_observed.Z.freq < freq_max) & (mt_obj_observed.Z.freq > freq_min))[0]
+            fidx_obs = np.where((mt_obj_observed.Z.frequency < freq_max) & (mt_obj_observed.Z.frequency > freq_min))[0]
         
             if np.size(fidx_obs)==0:
                 raise Exception('Your observed data file contains frequencies which are not in the modelled response file or vice versa. Sure inversion was ran with this data file?')
             else:
                 fidx_obs = fidx_obs[0]
                 
-            fidx_mod = np.where((mt_obj_modelled.Z.freq < freq_max) & (mt_obj_modelled.Z.freq > freq_min))[0]
+            fidx_mod = np.where((mt_obj_modelled.Z.frequency < freq_max) & (mt_obj_modelled.Z.frequency > freq_min))[0]
             
             if np.size(fidx_mod)==0:
                 raise Exception('This should not happen...')
@@ -371,7 +353,7 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
         
             Z_obs = mt_obj_observed.Z.z[fidx_obs]
             Z_mod = mt_obj_modelled.Z.z[fidx_mod]
-            Z_err = mt_obj_observed.Z.z_err[fidx_obs]
+            Z_err = mt_obj_observed.Z.z_error[fidx_obs]
         
             mse = 0
             # If Observation are mutted, skip

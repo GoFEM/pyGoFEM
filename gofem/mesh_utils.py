@@ -167,7 +167,7 @@ def alpha_shape(points, alpha):
     edge_points = []
     # loop over triangles:
     # ia, ib, ic = indices of corner points of the triangle
-    for ia, ib, ic in tri.vertices:
+    for ia, ib, ic in tri.simplices:
         pa = coords[ia]
         pb = coords[ib]
         pc = coords[ic]
@@ -276,7 +276,7 @@ def points_in_polygon(points_xy, polygon, quadrat_width):
 
     # find the points that intersect with each subpolygon and add them to points_within_geometry
     points_within = pd.DataFrame()
-    for poly in geometry_cut:
+    for poly in geometry_cut.geoms:
         # buffer by the <1 micron dist to account for any space lost in the quadrat cutting
         # otherwise may miss point(s) that lay directly on quadrat line
         poly = poly.buffer(1e-6).buffer(0)
@@ -285,7 +285,7 @@ def points_in_polygon(points_xy, polygon, quadrat_width):
         possible_matches_index = list(sindex.intersection(poly.bounds))
         possible_matches = gdf_nodes.iloc[possible_matches_index]
         precise_matches = possible_matches[possible_matches.intersects(poly)]
-        points_within = points_within.append(precise_matches)
+        points_within = pd.concat([points_within, precise_matches])
 
     #points_outside = gdf_nodes[~gdf_nodes.isin(points_within)]
     

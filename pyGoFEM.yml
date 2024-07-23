@@ -2,29 +2,17 @@ name: pygofem
 channels:
   - conda-forge
 dependencies:
-  - python=3.8
-  - ipywidgets
-  - gcc_linux-64
-  - gfortran_linux-64
-  - gxx_linux-64
-  - mpich
-  - hdf5[build=mpi_mpich*]
+  - python=3.10
   - netcdf4
   - jupyter
   - jupyterlab
-  - nb_conda_kernels
-  - ipython
   - matplotlib
   - numpy
   - dealii
   - cartopy
   - pandas
   - geopandas
-  - osmnx
-  - nodejs
-  - paraview
   - h5py
-  - pyyaml
-  - cmake
+  - mtpy-v2
   - boost-cpp=1.74
   - boost=1.74
