@@ -378,12 +378,15 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
             else:
                 normalized_residual_re = np.divide((Z_obs.real - Z_mod.real), Z_err)
                 normalized_residual_im = np.divide((Z_obs.imag - Z_obs.imag), Z_err)
-                mse = normalized_residual_re[0,1]**2 + normalized_residual_im[1,0]**2
+                mse = normalized_residual_re[0,1]**2 + normalized_residual_re[1,0]**2
+                mse += normalized_residual_im[0,1]**2 + normalized_residual_im[1,0]**2
                 n_data_per_period[fidx_obs] += 4
                 n_data_per_station[sidx] += 4
 
                 # Save normalized residuals
-                normalized_residuals = np.r_[normalized_residuals, normalized_residual_re[0,1], normalized_residual_im[0,1]]
+                normalized_residuals = np.r_[normalized_residuals,
+                                             normalized_residual_re[0,1], normalized_residual_re[1,0],
+                                             normalized_residual_im[0,1], normalized_residual_im[1,0]]
             
             mse_per_period[fidx_obs] += mse
             mse_per_station[sidx] += mse
