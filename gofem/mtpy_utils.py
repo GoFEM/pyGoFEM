@@ -319,8 +319,9 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
 
     n_data_per_period = np.zeros(shape=(len(frequencies_mod),))
     n_data_per_station = np.zeros(shape=(len(stn_obs_codes),))
-    
-    
+
+    normalized_residuals = np.empty(shape=(0,))
+        
     # Compute the misfit for each station
     for mt_obj_modelled in mt_mod_list:
         sidx = np.where( stn_obs_codes == mt_obj_modelled.station )[0]
@@ -362,18 +363,27 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
                 
             # Full Impedance
             if((np.abs(Z_obs[0,0]) > 0.) & (np.abs(Z_obs[1,1]) > 0.)):
-                mse = np.divide((Z_obs.real - Z_mod.real)**2, Z_err**2) +\
-                      np.divide((Z_obs.imag - Z_mod.imag)**2, Z_err**2)
+                normalized_residual_re = np.divide((Z_obs.real - Z_mod.real), Z_err)
+                normalized_residual_im = np.divide((Z_obs.imag - Z_obs.imag), Z_err)
+                mse = normalized_residual_re**2 + normalized_residual_im**2
                 mse = np.sum(mse)
+
                 n_data_per_period[fidx_obs] += 8
                 n_data_per_station[sidx] += 8
+
+                # Save normalized residuals
+                normalized_residuals = np.r_[normalized_residuals, normalized_residual_re, normalized_residual_im]
+
             # Only off-diagonal components
             else:
-                mse = np.divide((Z_obs.real - Z_mod.real)**2, Z_err**2) +\
-                      np.divide((Z_obs.imag - Z_mod.imag)**2, Z_err**2)
-                mse = mse[0,1] + mse[1,0]
+                normalized_residual_re = np.divide((Z_obs.real - Z_mod.real), Z_err)
+                normalized_residual_im = np.divide((Z_obs.imag - Z_obs.imag), Z_err)
+                mse = normalized_residual_re[0,1]**2 + normalized_residual_im[1,0]**2
                 n_data_per_period[fidx_obs] += 4
                 n_data_per_station[sidx] += 4
+
+                # Save normalized residuals
+                normalized_residuals = np.r_[normalized_residuals, normalized_residual_re[0,1], normalized_residual_im[0,1]]
             
             mse_per_period[fidx_obs] += mse
             mse_per_station[sidx] += mse
@@ -388,14 +398,14 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
     rmse_per_station = np.sqrt(np.divide(mse_per_station, n_data_per_station))
     rmse_total = np.sqrt(mse_total / np.sum(n_data_per_period))
     
-    return rmse_total, rmse_per_station, rmse_per_period, 1./ frequencies_mod, stn_obs_codes
+    return rmse_total, rmse_per_station, rmse_per_period, 1./ frequencies_mod, stn_obs_codes, normalized_residuals
 
 
 def calculate_rms_T(mt_obs_list, mt_mod_list, ftol = 0.03):
     
     frequencies_mod = np.array([])
     for mt_obj_modelled in mt_mod_list:
-        for frequency in mt_obj_modelled.Z.freq:
+        for frequency in mt_obj_modelled.Tipper.frequency:
             freq_max = frequency * (1 + ftol)
             freq_min = frequency * (1 - ftol)
             
@@ -414,6 +424,7 @@ def calculate_rms_T(mt_obs_list, mt_mod_list, ftol = 0.03):
     n_data_per_station = np.zeros(shape=(len(stn_obs_codes),))
     
     stations = []
+    normalized_residuals = np.empty(shape=(0,))
     
     # Compute the misfit for each station
     for mt_obj_modelled in mt_mod_list:
@@ -427,55 +438,71 @@ def calculate_rms_T(mt_obs_list, mt_mod_list, ftol = 0.03):
         stations.append(mt_obj_modelled.station)
 
         mt_obj_observed = mt_obs_list[sidx]
+
+        tipper_obs = mt_obj_observed.Tipper.tipper
+        tipper_err = mt_obj_observed.Tipper.tipper_error
+        tipper_mod = mt_obj_modelled.Tipper.tipper
+
+        station_mod_freqs = mt_obj_modelled.Tipper.frequency
+        station_obs_freqs = mt_obj_observed.Tipper.frequency
     
         for frequency in frequencies_mod:
             freq_max = frequency * (1 + ftol)
             freq_min = frequency * (1 - ftol)
         
-            fidx_obs = np.where((mt_obj_observed.Tipper.freq < freq_max) & (mt_obj_observed.Tipper.freq > freq_min))[0]
+            fidx_obs = np.where((station_obs_freqs < freq_max) & (station_obs_freqs > freq_min))[0]
         
             if np.size(fidx_obs)==0:
-                raise Exception('Your observed data file contains frequencies which are not in the modelled response file or vice versa. Sure inversion was ran with this data file?')
+                raise Exception('Your observed data contains frequency %f which are not in the modelled response file or vice versa.' % frequency)
             else:
                 fidx_obs = fidx_obs[0]
                 
-            fidx_mod = np.where((mt_obj_modelled.Tipper.freq < freq_max) & (mt_obj_modelled.Tipper.freq > freq_min))[0]
+            fidx_mod = np.where((station_mod_freqs < freq_max) & (station_mod_freqs > freq_min))[0]
             
             if np.size(fidx_mod)==0:
                 raise Exception('This should not happen...')
             else:
                 fidx_mod = fidx_mod[0]
         
-            T_obs = mt_obj_observed.Tipper.tipper[fidx_obs]
-            T_err = mt_obj_observed.Tipper.tipper_err[fidx_obs]
-            
-            T_mod = mt_obj_modelled.Tipper.tipper[fidx_mod]
+            T_obs = tipper_obs[fidx_obs]
+            T_err = tipper_err[fidx_obs]
+            T_mod = tipper_mod[fidx_mod]
         
             mse = 0
             # Tzx
             if(np.abs(T_obs[0,0]) > 0.):
-                mse = (T_obs[0,0].real - T_mod[0,0].real)**2 / T_err[0,0]**2 +\
-                      (T_obs[0,0].imag - T_mod[0,0].imag)**2 / T_err[0,0]**2
+                normalized_residual_re = (T_obs[0,0].real - T_mod[0,0].real) / T_err[0,0]
+                normalized_residual_im = (T_obs[0,0].imag - T_mod[0,0].imag) / T_err[0,0]
+                mse = normalized_residual_re**2 + normalized_residual_im**2
+
                 n_data_per_period[fidx_obs] += 2
                 n_data_per_station[sidx] += 2
                 
                 mse_per_period[fidx_obs] += mse
                 mse_per_station[sidx] += mse
                 mse_total += mse
+
+                # Save normalized residuals
+                normalized_residuals = np.r_[normalized_residuals, normalized_residual_re, normalized_residual_im]
             
             # Tzy
             if(np.abs(T_obs[0,1]) > 0.):
-                mse = (T_obs[0,1].real - T_mod[0,1].real)**2 / T_err[0,1]**2 +\
-                      (T_obs[0,1].imag - T_mod[0,1].imag)**2 / T_err[0,1]**2
+                normalized_residual_re = (T_obs[0,1].real - T_mod[0,1].real) / T_err[0,1]
+                normalized_residual_im = (T_obs[0,1].imag - T_mod[0,1].imag) / T_err[0,1]
+                mse = normalized_residual_re**2 + normalized_residual_im**2
+
                 n_data_per_period[fidx_obs] += 2
                 n_data_per_station[sidx] += 2
             
                 mse_per_period[fidx_obs] += mse
                 mse_per_station[sidx] += mse
                 mse_total += mse
+
+                # Save normalized residuals
+                normalized_residuals = np.r_[normalized_residuals, normalized_residual_re, normalized_residual_im]
         
     rmse_per_period = np.sqrt(np.divide(mse_per_period, n_data_per_period))
     rmse_per_station = np.sqrt(np.divide(mse_per_station, n_data_per_station))
     rmse_total = np.sqrt(mse_total / np.sum(n_data_per_period))
     
-    return rmse_total, rmse_per_station, rmse_per_period, 1./ frequencies_mod, stn_obs_codes
+    return rmse_total, rmse_per_station, rmse_per_period, 1./ frequencies_mod, stn_obs_codes, normalized_residuals
