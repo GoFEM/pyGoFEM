@@ -6,7 +6,7 @@ See jupyter notebooks for examples on how to setup GoFEM with python and process
 
 It invokes [MTPy-v2](https://mtpy-v2.readthedocs.io/en/latest/index.html) for handling MT data. 
 
-To generate and work with **GoFEM** mesh/model files, we use the [Python interface](https://github.com/dealii/dealii/blob/master/contrib/python-bindings/notebooks/tutorial-1.ipynb) of the deal.II library. It was introduced since deal.II v9.2.
+To generate and work with **GoFEM** mesh and model files, we use the [Python interface](https://github.com/dealii/dealii/blob/master/contrib/python-bindings/notebooks/tutorial-1.ipynb) of the [deal.II](https://www.dealii.org/) library. It is available in deal.II since version 9.2, see the [Release](https://www.degruyter.com/document/doi/10.1515/jnma-2020-0043/html) co-authored by me.
 
 # Contributing
 
@@ -27,11 +27,11 @@ That is it! You should now be able to run the tutorial notebooks.
 
 ### Windows
 
-On Windows, you can use [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl) and follow instructions for **Linux** above. *Note* that WSL version **2** or newer is needed. 
+On Windows, you have to use [Windows Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl) and follow instructions for **Linux** above. *Note* that WSL version **2** or newer is required. 
 
 ### macOS
 
-The process is identical to **Linux**. However, you may need to replace linux compiler packages in the *pyGoFEM.yml* files. Specifically, these
+The process is identical to the **Linux**. However, you may need to replace linux compiler packages in the *pyGoFEM.yml* files. Specifically, these
 
 - gcc_linux-64
 - gxx_linux-64
@@ -47,7 +47,7 @@ For more details check [this](https://docs.conda.io/projects/conda-build/en/late
 
 # Referencing
 
-Aknowledge GoFEM and deal.II by citing one or more of the following references
+Please acknowledge GoFEM and deal.II by citing one or more of the following publications:
 
 > Grayver A.V., 2015, *Parallel 3D magnetotelluric inversion using adaptive finite-element method. Part I: theory and synthetic study*, Geophysical Journal International, 202(1), pp. 584-603, doi: 10.1093/gji/ggv165
 
