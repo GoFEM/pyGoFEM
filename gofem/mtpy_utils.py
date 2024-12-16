@@ -364,12 +364,14 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
             # Full Impedance
             if((np.abs(Z_obs[0,0]) > 0.) & (np.abs(Z_obs[1,1]) > 0.)):
                 normalized_residual_re = np.divide((Z_obs.real - Z_mod.real), Z_err)
-                normalized_residual_im = np.divide((Z_obs.imag - Z_obs.imag), Z_err)
+                normalized_residual_im = np.divide((Z_obs.imag - Z_mod.imag), Z_err)
                 mse = normalized_residual_re**2 + normalized_residual_im**2
                 mse = np.sum(mse)
 
                 n_data_per_period[fidx_obs] += 8
                 n_data_per_station[sidx] += 8
+
+                print(normalized_residual_re, normalized_residual_im)
 
                 # Save normalized residuals
                 normalized_residuals = np.r_[normalized_residuals, normalized_residual_re, normalized_residual_im]
@@ -377,7 +379,7 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
             # Only off-diagonal components
             else:
                 normalized_residual_re = np.divide((Z_obs.real - Z_mod.real), Z_err)
-                normalized_residual_im = np.divide((Z_obs.imag - Z_obs.imag), Z_err)
+                normalized_residual_im = np.divide((Z_obs.imag - Z_mod.imag), Z_err)
                 mse = normalized_residual_re[0,1]**2 + normalized_residual_re[1,0]**2
                 mse += normalized_residual_im[0,1]**2 + normalized_residual_im[1,0]**2
                 n_data_per_period[fidx_obs] += 4
