@@ -374,7 +374,7 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
                 print(normalized_residual_re, normalized_residual_im)
 
                 # Save normalized residuals
-                normalized_residuals = np.r_[normalized_residuals, normalized_residual_re, normalized_residual_im]
+                normalized_residuals = np.r_[normalized_residuals, normalized_residual_re.flatten(), normalized_residual_im.flatten()]
 
             # Only off-diagonal components
             else:
