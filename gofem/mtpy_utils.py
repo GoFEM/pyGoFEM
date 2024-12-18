@@ -169,7 +169,7 @@ def write_mt_collection_to_gofem(outfile, mt_collection = None, mt_objects = Non
                 f.write("%s %0.6e Plane_wave %s %0.6e %0.6e\n" % (data_row[0], data_row[1], data_row[2], data_row[3], data_row[4]))
 
 
-def read_gofem_modelling_output(fileformat, frequency_list, station_list, station_coords):
+def read_gofem_modelling_output(fileformat, frequency_list, station_list, station_coords, dim = 3):
     '''
         Read in GoFEM modelling output and return a list of MTpy objects
     '''
@@ -197,13 +197,19 @@ def read_gofem_modelling_output(fileformat, frequency_list, station_list, statio
                 
             station = row['Receiver']
             
-            Z_data_dict[station][fidx, 0, 0] = row['Zxx'] * factor
-            Z_data_dict[station][fidx, 0, 1] = row['Zxy'] * factor
-            Z_data_dict[station][fidx, 1, 0] = row['Zyx'] * factor
-            Z_data_dict[station][fidx, 1, 1] = row['Zyy'] * factor
+            if dim == 3:
+                Z_data_dict[station][fidx, 0, 0] = row['Zxx'] * factor
+                Z_data_dict[station][fidx, 0, 1] = row['Zxy'] * factor
+                Z_data_dict[station][fidx, 1, 0] = row['Zyx'] * factor
+                Z_data_dict[station][fidx, 1, 1] = row['Zyy'] * factor
             
-            T_data_dict[station][fidx, 0, 0] = row['Tzx']
-            T_data_dict[station][fidx, 0, 1] = row['Tzy']
+                T_data_dict[station][fidx, 0, 0] = row['Tzx']
+                T_data_dict[station][fidx, 0, 1] = row['Tzy']
+            elif dim == 2:
+                Z_data_dict[station][fidx, 0, 1] = row['Zxy'] * factor
+                Z_data_dict[station][fidx, 1, 0] = row['Zyx'] * factor
+
+                T_data_dict[station][fidx, 0, 0] = row['Tzy']
             
     mt_obj_list = []
     for station in Z_data_dict.keys():
@@ -332,6 +338,8 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
             sidx = sidx[0]
             
         mt_obj_observed = mt_obs_list[sidx]
+
+        print(mt_obj_observed.station)
     
         mse_total_station = 0
         for frequency in frequencies_mod:
@@ -370,8 +378,6 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
 
                 n_data_per_period[fidx_obs] += 8
                 n_data_per_station[sidx] += 8
-
-                print(normalized_residual_re, normalized_residual_im)
 
                 # Save normalized residuals
                 normalized_residuals = np.r_[normalized_residuals, normalized_residual_re.flatten(), normalized_residual_im.flatten()]
