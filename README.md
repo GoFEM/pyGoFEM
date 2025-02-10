@@ -23,6 +23,14 @@ conda env create -f pyGoFEM.yml
 conda activate pygofem
 ```
 
+After deploying the environment, we need to compile the deal.II library with the Python-interface enabled. To this end, first download the deal.II, for instance by doing *git clone https://github.com/dealii/dealii.git* or go directly for a release tarball, e.g. *wget https://dealii.org/downloads/dealii-9.5.2.tar.gz*. Go to the deal.II directory, configure and compile the library with the Python bindings enabled:
+
+```
+mkdir build; cd build
+cmake -DCMAKE_BUILD_TYPE=DebugRelease -DCMAKE_INSTALL_PREFIX=/path/to/lib/deal.II -DDEAL_II_STATIC_EXECUTABLE=OFF -DEAL_II_WITH_UMFPACK=OFF -DDEAL_II_COMPONENT_EXAMPLES=OFF -DDEAL_II_FORCE_BUNDLED_BOOST=OFF -DDEAL_II_COMPONENT_PYTHON_BINDINGS=ON ../
+make
+```
+
 That is it! You should now be able to run the tutorial notebooks.
 
 ### Windows

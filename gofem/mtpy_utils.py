@@ -56,7 +56,8 @@ def write_mt_collection_to_gofem(outfile, mt_collection = None, mt_objects = Non
     else:
         raise RuntimeError('Unsupported data type')
         
-    rho_err_func = lambda z, ze, freq: 2. * abs(z) / (2. * math.pi * freq * mu) * ze
+    mu0 = 4. * math.pi * 1e-7
+    rho_err_func = lambda z, ze, freq: 2. * abs(z) / (2. * math.pi * freq) * ze
     phi_err_func = lambda z, ze: 180. / math.pi * ze / abs(z)
     
     # Convert from [mV/km]/[nT] to Ohm
@@ -83,7 +84,7 @@ def write_mt_collection_to_gofem(outfile, mt_collection = None, mt_objects = Non
             mt_objects.append(mt_collection.get_tf(station))
     else:
         raise RuntimeError('Provide EDI collection or list of MT objects')
-    
+
     for freq in all_frequencies:
         
         period = 1./freq
@@ -108,14 +109,25 @@ def write_mt_collection_to_gofem(outfile, mt_collection = None, mt_objects = Non
             zobj = mt_obj.Z
             tobj = mt_obj.Tipper
             ptobj = mt_obj.pt
-            
+
+            if zobj.z_error is not None:
+                zerr = zobj.z_error
+                rhoerr = zobj.resistivity_error
+                pherr = zobj.phase_error
+            elif zobj.z_model_error is not None:
+                zerr = zobj.z_model_error
+                rhoerr = zobj.resistivity_model_error
+                pherr = zobj.phase_model_error
+            else:
+                raise Exception("No impedance error can be retrieved.")
+
             if(error_floor_type == 'rowwise'):
-                dZxy = max([zobj.z_error[p_index, 0, 1], error_floor * abs(zobj.z[p_index, 0, 1])]) * factor
-                dZyx = max([zobj.z_error[p_index, 1, 0], error_floor * abs(zobj.z[p_index, 1, 0])]) * factor
+                dZxy = max([zerr[p_index, 0, 1], error_floor * abs(zobj.z[p_index, 0, 1])]) * factor
+                dZyx = max([zerr[p_index, 1, 0], error_floor * abs(zobj.z[p_index, 1, 0])]) * factor
             elif(error_floor_type == 'offdiag'):
                 Z_mean = np.sqrt(np.abs(zobj.z[p_index, 0, 1]*zobj.z[p_index, 1, 0]))
-                dZxy = max([zobj.z_error[p_index, 0, 1], error_floor * Z_mean]) * factor
-                dZyx = max([zobj.z_error[p_index, 1, 0], error_floor * Z_mean]) * factor
+                dZxy = max([zerr[p_index, 0, 1], error_floor * Z_mean]) * factor
+                dZyx = max([zerr[p_index, 1, 0], error_floor * Z_mean]) * factor
                 
             dZ = np.zeros(shape=(2,2))
             dZ[0,:] = dZxy
@@ -134,16 +146,16 @@ def write_mt_collection_to_gofem(outfile, mt_collection = None, mt_objects = Non
                     mt_data.append([str_codes[7], freq, mt_obj.station, zobj.z[p_index, 1, 1].imag * factor, dZyx])
                                    
             elif data_type == 'RP_offdiag' or data_type == 'RP':
-                mt_data.append([str_codes[0], freq, mt_obj.station, zobj.resistivity[p_index, 0, 1], rho_err_func(zobj.z[p_index, 0, 1], dZxy, freq)])
-                mt_data.append([str_codes[1], freq, mt_obj.station, zobj.resistivity[p_index, 1, 0], rho_err_func(zobj.z[p_index, 1, 0], dZyx, freq)])
-                mt_data.append([str_codes[2], freq, mt_obj.station, zobj.phase[p_index, 0, 1], phi_err_func(zobj.z[p_index, 0, 1], dZxy)])
-                mt_data.append([str_codes[3], freq, mt_obj.station, zobj.phase[p_index, 1, 0], phi_err_func(zobj.z[p_index, 1, 0], dZyx)])
+                mt_data.append([str_codes[0], freq, mt_obj.station, zobj.resistivity[p_index, 0, 1], rhoerr[p_index, 0, 1]])
+                mt_data.append([str_codes[1], freq, mt_obj.station, zobj.resistivity[p_index, 1, 0], rhoerr[p_index, 1, 0]])
+                mt_data.append([str_codes[2], freq, mt_obj.station, zobj.phase[p_index, 0, 1], pherr[p_index, 0, 1]])
+                mt_data.append([str_codes[3], freq, mt_obj.station, zobj.phase[p_index, 1, 0], pherr[p_index, 1, 0]])
                 
                 if data_type == 'RP':
-                    mt_data.append([str_codes[4], freq, mt_obj.station, zobj.resistivity[p_index, 0, 0], rho_err_func(zobj.z[p_index, 0, 0], dZxy, freq)])
-                    mt_data.append([str_codes[5], freq, mt_obj.station, zobj.resistivity[p_index, 1, 1], rho_err_func(zobj.z[p_index, 1, 1], dZyx, freq)])
-                    mt_data.append([str_codes[6], freq, mt_obj.station, zobj.phase[p_index, 0, 0], phi_err_func(zobj.z[p_index, 0, 0], dZxy)])
-                    mt_data.append([str_codes[7], freq, mt_obj.station, zobj.phase[p_index, 1, 1], phi_err_func(zobj.z[p_index, 1, 1], dZyx)])
+                    mt_data.append([str_codes[4], freq, mt_obj.station, zobj.resistivity[p_index, 0, 0], rhoerr[p_index, 0, 0]])
+                    mt_data.append([str_codes[5], freq, mt_obj.station, zobj.resistivity[p_index, 1, 1], rhoerr[p_index, 0, 0]])
+                    mt_data.append([str_codes[6], freq, mt_obj.station, zobj.phase[p_index, 0, 0], pherr[p_index, 0, 0]])
+                    mt_data.append([str_codes[7], freq, mt_obj.station, zobj.phase[p_index, 1, 1], pherr[p_index, 1, 1]])
                     
             elif data_type == 'Tipper':
                 mt_data.append([str_codes[0], freq, mt_obj.station, tobj.tipper[p_index, 0, 0].real, max(tobj.tipper_err[p_index, 0, 0], error_floor)])

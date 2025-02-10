@@ -11,7 +11,7 @@ from matplotlib.collections import PatchCollection
 from functools import partial
 from shapely.geometry import Point
 
-def plot_2d_triangulation(triangulation, color_scheme = None, edge_color = 'k', color_norm = None):
+def plot_2d_triangulation(triangulation, color_scheme = None, edge_color = 'k', color_norm = None, linewidth = 0.5):
     
     fig, ax = plt.subplots()
     patches = []
@@ -32,7 +32,9 @@ def plot_2d_triangulation(triangulation, color_scheme = None, edge_color = 'k', 
         if color_scheme:
             colors.append(color_scheme(cell))
 
-    p = PatchCollection(patches, edgecolors=edge_color, facecolors=None, norm = color_norm)
+    p = PatchCollection(patches, edgecolors=edge_color,
+                        facecolors=None, norm = color_norm,
+                        linewidth = linewidth)
     p.set_array(np.array(colors))
     
     ax.add_collection(p)

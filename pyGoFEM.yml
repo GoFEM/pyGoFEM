@@ -2,17 +2,21 @@ name: pygofem
 channels:
   - conda-forge
 dependencies:
-  - python=3.10
-  - netcdf4
-  - jupyter
-  - jupyterlab
-  - matplotlib
-  - numpy
-  - dealii
-  - cartopy
-  - pandas
-  - geopandas
-  - h5py
-  - mtpy-v2
-  - boost-cpp=1.74
-  - boost=1.74
+- python=3.12
+- gcc_linux-64
+- gfortran_linux-64
+- gxx_linux-64
+- mpich
+- netcdf4
+- jupyter
+- jupyterlab
+- matplotlib
+- numpy
+- cartopy
+- pandas
+- geopandas
+- h5py
+- cmake
+- mtpy-v2
+- boost-cpp=1.84
+- boost=1.84
