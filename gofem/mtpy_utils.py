@@ -351,7 +351,7 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
             
         mt_obj_observed = mt_obs_list[sidx]
 
-        print(mt_obj_observed.station)
+        print(mt_obj_observed.station, end = '\t')
     
         mse_total_station = 0
         for frequency in frequencies_mod:
