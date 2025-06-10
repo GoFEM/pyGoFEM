@@ -23,7 +23,7 @@ conda env create -f pyGoFEM.yml
 conda activate pygofem
 ```
 
-After deploying the environment, we need to compile the deal.II library with the Python-interface enabled. To this end, first download the deal.II, for instance by doing *git clone https://github.com/dealii/dealii.git* or go directly for a release tarball, e.g. *wget https://dealii.org/downloads/dealii-9.5.2.tar.gz*. Go to the deal.II directory, configure and compile the library with the Python bindings enabled:
+After deploying the environment, we need to compile the deal.II library with the Python-interface enabled. To this end, first download the deal.II, for instance by doing *git clone https://github.com/dealii/dealii.git* or go directly for a release tarball, e.g. *wget https://dealii.org/downloads/dealii-9.6.2.tar.gz*. Go to the deal.II directory, configure and compile the library with the Python bindings enabled:
 
 ```
 mkdir build; cd build
