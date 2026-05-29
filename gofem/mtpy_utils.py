@@ -404,31 +404,78 @@ def read_gofem_phase_tensor_inversion_output(data_file, fill_missing=False):
     return data_dict, np.sort(df_pt["frequency"].astype(float).unique())
 
 
-def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
-    
+def _find_frequency_index(frequencies, frequency, ftol, data_type, station):
+    if not np.isfinite(frequency):
+        raise Exception("%s data for station %s contains a non-finite frequency." % (data_type, station))
+
+    frequencies = np.asarray(frequencies, dtype=float)
+    fidx = np.where(np.isclose(frequencies, frequency, rtol=ftol, atol=0.0))[0]
+
+    if np.size(fidx) == 0:
+        raise Exception(
+            "%s data for station %s does not contain frequency %.12e within tolerance %.1e."
+            % (data_type, station, frequency, ftol)
+        )
+
+    if np.size(fidx) > 1:
+        raise Exception(
+            "%s data for station %s contains multiple frequencies matching %.12e within tolerance %.1e."
+            % (data_type, station, frequency, ftol)
+        )
+
+    return fidx[0]
+
+
+def _validate_frequency_sets(obs_frequencies, mod_frequencies, ftol, data_type, station):
+    obs_frequencies = np.asarray(obs_frequencies, dtype=float)
+    mod_frequencies = np.asarray(mod_frequencies, dtype=float)
+
+    for frequency in mod_frequencies:
+        _find_frequency_index(obs_frequencies, frequency, ftol, data_type, station)
+
+    for frequency in obs_frequencies:
+        _find_frequency_index(mod_frequencies, frequency, ftol, data_type, station)
+
+
+def _collect_modelled_frequencies(frequency_arrays, ftol):
     frequencies_mod = np.array([])
-    for mt_obj_modelled in mt_mod_list:
-        for frequency in mt_obj_modelled.Z.frequency:
-            freq_max = frequency * (1 + ftol)
-            freq_min = frequency * (1 - ftol)
-            
-            fidx = np.where((frequencies_mod < freq_max) & (frequencies_mod > freq_min))[0]
-        
-            if np.size(fidx)==0:
+
+    for frequencies in frequency_arrays:
+        for frequency in np.asarray(frequencies, dtype=float):
+            if not np.isfinite(frequency):
+                raise Exception("Modelled frequency grid contains a non-finite frequency.")
+
+            fidx = np.where(np.isclose(frequencies_mod, frequency, rtol=ftol, atol=0.0))[0]
+
+            if np.size(fidx) > 1:
+                raise Exception(
+                    "Modelled frequency grid contains multiple frequencies matching %.12e within tolerance %.1e."
+                    % (frequency, ftol)
+                )
+
+            if np.size(fidx) == 0:
                 frequencies_mod = np.append(frequencies_mod, frequency)
-            
+
+    return np.sort(frequencies_mod)
+
+
+def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol=0.03):
+
+    frequencies_mod = _collect_modelled_frequencies(
+        [mt_obj_modelled.Z.frequency for mt_obj_modelled in mt_mod_list],
+        ftol,
+    )
+
     stn_obs_codes = np.array([mt_obs.station for mt_obs in mt_obs_list])
 
     mse_per_period = np.zeros(shape=(len(frequencies_mod),))
     mse_per_station = np.zeros(shape=(len(stn_obs_codes),))
-    mse_total = 0
+    mse_total = 0.0
 
     n_data_per_period = np.zeros(shape=(len(frequencies_mod),))
     n_data_per_station = np.zeros(shape=(len(stn_obs_codes),))
 
     normalized_residuals = np.empty(shape=(0,))
-
-    periods = np.zeros(shape=(len(frequencies_mod),))
         
     # Compute the misfit for each station
     for mt_obj_modelled in mt_mod_list:
@@ -441,88 +488,87 @@ def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
             
         mt_obj_observed = mt_obs_list[sidx]
 
-        print(mt_obj_observed.station, end = '\t')
-    
-        mse_total_station = 0
-        for frequency in frequencies_mod:
-            freq_max = frequency * (1 + ftol)
-            freq_min = frequency * (1 - ftol)
-        
-            fidx_obs = np.where((mt_obj_observed.Z.frequency < freq_max) & (mt_obj_observed.Z.frequency > freq_min))[0]
-        
-            if np.size(fidx_obs)==0:
-                raise Exception('Your observed data file contains frequencies which are not in the modelled response file or vice versa. Sure inversion was ran with this data file?')
-            else:
-                fidx_obs = fidx_obs[0]
-                
-            fidx_mod = np.where((mt_obj_modelled.Z.frequency < freq_max) & (mt_obj_modelled.Z.frequency > freq_min))[0]
-            
-            if np.size(fidx_mod)==0:
-                raise Exception('This should not happen...')
-            else:
-                fidx_mod = fidx_mod[0]
+        _validate_frequency_sets(
+            mt_obj_observed.Z.frequency,
+            mt_obj_modelled.Z.frequency,
+            ftol,
+            "impedance",
+            mt_obj_modelled.station,
+        )
+
+        for pidx, frequency in enumerate(frequencies_mod):
+            fidx_obs = _find_frequency_index(
+                mt_obj_observed.Z.frequency,
+                frequency,
+                ftol,
+                "observed impedance",
+                mt_obj_modelled.station,
+            )
+            fidx_mod = _find_frequency_index(
+                mt_obj_modelled.Z.frequency,
+                frequency,
+                ftol,
+                "modelled impedance",
+                mt_obj_modelled.station,
+            )
         
             Z_obs = mt_obj_observed.Z.z[fidx_obs]
             Z_mod = mt_obj_modelled.Z.z[fidx_mod]
             Z_err = mt_obj_observed.Z.z_error[fidx_obs]
-        
-            mse = 0
-            # If Observation are mutted, skip
-            if np.all( Z_obs == 0 ):
-                continue
-                
-            for i in range(2):
-                for j in range(2):
-                    if((np.abs(Z_obs[i,j]) > 0.) & (np.abs(Z_err[i,j]) > 0.)):
-                        normalized_residual_re = (Z_obs[i,j].real - Z_mod[i,j].real) / Z_err[i,j]
-                        normalized_residual_im = (Z_obs[i,j].imag - Z_mod[i,j].imag) / Z_err[i,j]
-                        mse += normalized_residual_re**2 + normalized_residual_im**2
-                        n_data_per_period[fidx_obs] += 2
-                        n_data_per_station[sidx] += 2
 
-                        # Save normalized residuals
-                        normalized_residuals = np.r_[normalized_residuals,normalized_residual_re, normalized_residual_im]
-            
-            mse_per_period[fidx_obs] += mse
-            periods[fidx_obs] = 1.0 / mt_obj_observed.frequency[fidx_obs]
+            if np.all(Z_obs == 0):
+                continue
+
+            valid = (
+                np.isfinite(Z_obs)
+                & np.isfinite(Z_mod)
+                & np.isfinite(Z_err)
+                & (np.abs(Z_err) > 0.0)
+                & (np.abs(Z_obs) > 0.0)
+            )
+
+            if not np.any(valid):
+                continue
+
+            residual_re = (Z_obs.real[valid] - Z_mod.real[valid]) / Z_err[valid]
+            residual_im = (Z_obs.imag[valid] - Z_mod.imag[valid]) / Z_err[valid]
+            residual = np.r_[residual_re, residual_im]
+            mse = np.sum(residual ** 2)
+            n_data = residual.size
+
+            n_data_per_period[pidx] += n_data
+            n_data_per_station[sidx] += n_data
+
+            mse_per_period[pidx] += mse
             mse_per_station[sidx] += mse
             mse_total += mse
-            mse_total_station += mse
 
-        # remove misfit for station with very large rmse
-        #if np.sqrt(mse_total_station/n_data_per_station[sidx]) > 5:
-        #    mse_total -= mse_total_station
+            normalized_residuals = np.r_[normalized_residuals, residual]
 
-    rmse_per_period = np.sqrt(np.divide(mse_per_period, n_data_per_period))
-    rmse_per_station = np.sqrt(np.divide(mse_per_station, n_data_per_station))
-    rmse_total = np.sqrt(mse_total / np.sum(n_data_per_period))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rmse_per_period = np.sqrt(np.divide(mse_per_period, n_data_per_period))
+        rmse_per_station = np.sqrt(np.divide(mse_per_station, n_data_per_station))
+        rmse_total = np.sqrt(mse_total / np.sum(n_data_per_period))
     
-    return rmse_total, rmse_per_station, rmse_per_period, periods, stn_obs_codes, normalized_residuals
+    return rmse_total, rmse_per_station, rmse_per_period, 1.0 / frequencies_mod, stn_obs_codes, normalized_residuals
 
 
-def calculate_rms_T(mt_obs_list, mt_mod_list, ftol = 0.03):
+def calculate_rms_T(mt_obs_list, mt_mod_list, ftol=0.03):
     
-    frequencies_mod = np.array([])
-    for mt_obj_modelled in mt_mod_list:
-        for frequency in mt_obj_modelled.Tipper.frequency:
-            freq_max = frequency * (1 + ftol)
-            freq_min = frequency * (1 - ftol)
-            
-            fidx = np.where((frequencies_mod < freq_max) & (frequencies_mod > freq_min))[0]
-        
-            if np.size(fidx)==0:
-                frequencies_mod = np.append(frequencies_mod, frequency)
+    frequencies_mod = _collect_modelled_frequencies(
+        [mt_obj_modelled.Tipper.frequency for mt_obj_modelled in mt_mod_list],
+        ftol,
+    )
             
     stn_obs_codes = np.array([mt_obs.station for mt_obs in mt_obs_list])
 
     mse_per_period = np.zeros(shape=(len(frequencies_mod),))
     mse_per_station = np.zeros(shape=(len(stn_obs_codes),))
-    mse_total = 0
+    mse_total = 0.0
 
     n_data_per_period = np.zeros(shape=(len(frequencies_mod),))
     n_data_per_station = np.zeros(shape=(len(stn_obs_codes),))
     
-    stations = []
     normalized_residuals = np.empty(shape=(0,))
     
     # Compute the misfit for each station
@@ -533,8 +579,6 @@ def calculate_rms_T(mt_obs_list, mt_mod_list, ftol = 0.03):
             raise Exception('Your modelled data file contains station ' + mt_obj_modelled.station + ' which is not in the observed response file. Sure both files came out of the same inversion run?')
         else:
             sidx = sidx[0]
-            
-        stations.append(mt_obj_modelled.station)
 
         mt_obj_observed = mt_obs_list[sidx]
 
@@ -544,67 +588,67 @@ def calculate_rms_T(mt_obs_list, mt_mod_list, ftol = 0.03):
 
         station_mod_freqs = mt_obj_modelled.Tipper.frequency
         station_obs_freqs = mt_obj_observed.Tipper.frequency
+
+        _validate_frequency_sets(
+            station_obs_freqs,
+            station_mod_freqs,
+            ftol,
+            "tipper",
+            mt_obj_modelled.station,
+        )
     
-        for frequency in frequencies_mod:
-            freq_max = frequency * (1 + ftol)
-            freq_min = frequency * (1 - ftol)
-        
-            fidx_obs = np.where((station_obs_freqs < freq_max) & (station_obs_freqs > freq_min))[0]
-        
-            if np.size(fidx_obs)==0:
-                raise Exception('Your observed data contains frequency %f which are not in the modelled response file or vice versa.' % frequency)
-            else:
-                fidx_obs = fidx_obs[0]
-                
-            fidx_mod = np.where((station_mod_freqs < freq_max) & (station_mod_freqs > freq_min))[0]
-            
-            if np.size(fidx_mod)==0:
-                raise Exception('This should not happen...')
-            else:
-                fidx_mod = fidx_mod[0]
+        for pidx, frequency in enumerate(frequencies_mod):
+            fidx_obs = _find_frequency_index(
+                station_obs_freqs,
+                frequency,
+                ftol,
+                "observed tipper",
+                mt_obj_modelled.station,
+            )
+            fidx_mod = _find_frequency_index(
+                station_mod_freqs,
+                frequency,
+                ftol,
+                "modelled tipper",
+                mt_obj_modelled.station,
+            )
         
             T_obs = tipper_obs[fidx_obs]
             T_err = tipper_err[fidx_obs]
             T_mod = tipper_mod[fidx_mod]
-        
-            mse = 0
-            # Tzx
-            if(np.abs(T_obs[0,0]) > 0.):
-                normalized_residual_re = (T_obs[0,0].real - T_mod[0,0].real) / T_err[0,0]
-                normalized_residual_im = (T_obs[0,0].imag - T_mod[0,0].imag) / T_err[0,0]
-                mse = normalized_residual_re**2 + normalized_residual_im**2
 
-                n_data_per_period[fidx_obs] += 2
-                n_data_per_station[sidx] += 2
-                
-                mse_per_period[fidx_obs] += mse
-                mse_per_station[sidx] += mse
-                mse_total += mse
+            valid = (
+                np.isfinite(T_obs)
+                & np.isfinite(T_mod)
+                & np.isfinite(T_err)
+                & (np.abs(T_err) > 0.0)
+                & (np.abs(T_obs) > 0.0)
+            )
 
-                # Save normalized residuals
-                normalized_residuals = np.r_[normalized_residuals, normalized_residual_re, normalized_residual_im]
-            
-            # Tzy
-            if(np.abs(T_obs[0,1]) > 0.):
-                normalized_residual_re = (T_obs[0,1].real - T_mod[0,1].real) / T_err[0,1]
-                normalized_residual_im = (T_obs[0,1].imag - T_mod[0,1].imag) / T_err[0,1]
-                mse = normalized_residual_re**2 + normalized_residual_im**2
+            if not np.any(valid):
+                continue
 
-                n_data_per_period[fidx_obs] += 2
-                n_data_per_station[sidx] += 2
-            
-                mse_per_period[fidx_obs] += mse
-                mse_per_station[sidx] += mse
-                mse_total += mse
+            residual_re = (T_obs.real[valid] - T_mod.real[valid]) / T_err[valid]
+            residual_im = (T_obs.imag[valid] - T_mod.imag[valid]) / T_err[valid]
+            residual = np.r_[residual_re, residual_im]
+            mse = np.sum(residual ** 2)
+            n_data = residual.size
 
-                # Save normalized residuals
-                normalized_residuals = np.r_[normalized_residuals, normalized_residual_re, normalized_residual_im]
-        
-    rmse_per_period = np.sqrt(np.divide(mse_per_period, n_data_per_period))
-    rmse_per_station = np.sqrt(np.divide(mse_per_station, n_data_per_station))
-    rmse_total = np.sqrt(mse_total / np.sum(n_data_per_period))
+            n_data_per_period[pidx] += n_data
+            n_data_per_station[sidx] += n_data
+
+            mse_per_period[pidx] += mse
+            mse_per_station[sidx] += mse
+            mse_total += mse
+
+            normalized_residuals = np.r_[normalized_residuals, residual]
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rmse_per_period = np.sqrt(np.divide(mse_per_period, n_data_per_period))
+        rmse_per_station = np.sqrt(np.divide(mse_per_station, n_data_per_station))
+        rmse_total = np.sqrt(mse_total / np.sum(n_data_per_period))
     
-    return rmse_total, rmse_per_station, rmse_per_period, 1./ frequencies_mod, stn_obs_codes, normalized_residuals
+    return rmse_total, rmse_per_station, rmse_per_period, 1.0 / frequencies_mod, stn_obs_codes, normalized_residuals
 
 
 def calculate_rms_PT(pt_obs_dict, pt_mod_dict, ftol=0.03):
@@ -617,18 +661,10 @@ def calculate_rms_PT(pt_obs_dict, pt_mod_dict, ftol=0.03):
         ``read_gofem_phase_tensor_inversion_output``.
     """
 
-    frequencies_mod = np.array([])
-    for station in pt_mod_dict:
-        for frequency in pt_mod_dict[station]["frequencies"]:
-            freq_max = frequency * (1 + ftol)
-            freq_min = frequency * (1 - ftol)
-
-            fidx = np.where((frequencies_mod < freq_max) & (frequencies_mod > freq_min))[0]
-
-            if np.size(fidx) == 0:
-                frequencies_mod = np.append(frequencies_mod, frequency)
-
-    frequencies_mod = np.sort(frequencies_mod)
+    frequencies_mod = _collect_modelled_frequencies(
+        [pt_mod_dict[station]["frequencies"] for station in pt_mod_dict],
+        ftol,
+    )
     stn_obs_codes = np.array([station for station in pt_obs_dict.keys()])
 
     mse_per_period = np.zeros(shape=(len(frequencies_mod),))
@@ -658,30 +694,33 @@ def calculate_rms_PT(pt_obs_dict, pt_mod_dict, ftol=0.03):
         station_mod_freqs = np.asarray(pt_obj_modelled["frequencies"], dtype=float)
         station_obs_freqs = np.asarray(pt_obj_observed["frequencies"], dtype=float)
 
+        _validate_frequency_sets(
+            station_obs_freqs,
+            station_mod_freqs,
+            ftol,
+            "phase tensor",
+            station,
+        )
+
         phase_tensor_obs = np.asarray(pt_obj_observed["PhaseTensor"], dtype=float)
         phase_tensor_err = np.asarray(pt_obj_observed["PhT_err"], dtype=float)
         phase_tensor_mod = np.asarray(pt_obj_modelled["PhaseTensor"], dtype=float)
 
         for pidx, frequency in enumerate(frequencies_mod):
-            freq_max = frequency * (1 + ftol)
-            freq_min = frequency * (1 - ftol)
-
-            fidx_obs = np.where((station_obs_freqs < freq_max) & (station_obs_freqs > freq_min))[0]
-
-            if np.size(fidx_obs) == 0:
-                raise Exception(
-                    "Your observed phase tensor data contains frequency %f "
-                    "which is not in the modelled response file or vice versa." % frequency
-                )
-            else:
-                fidx_obs = fidx_obs[0]
-
-            fidx_mod = np.where((station_mod_freqs < freq_max) & (station_mod_freqs > freq_min))[0]
-
-            if np.size(fidx_mod) == 0:
-                raise Exception("This should not happen...")
-            else:
-                fidx_mod = fidx_mod[0]
+            fidx_obs = _find_frequency_index(
+                station_obs_freqs,
+                frequency,
+                ftol,
+                "observed phase tensor",
+                station,
+            )
+            fidx_mod = _find_frequency_index(
+                station_mod_freqs,
+                frequency,
+                ftol,
+                "modelled phase tensor",
+                station,
+            )
 
             PT_obs = phase_tensor_obs[fidx_obs]
             PT_err = phase_tensor_err[fidx_obs]
