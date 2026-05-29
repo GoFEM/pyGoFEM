@@ -316,6 +316,94 @@ def read_gofem_inversion_output(data_file):
         
     return mt_obj_list, all_frequencies
 
+
+def phase_tensor_data_structure(receiver_names, measured_data, fill_missing=False):
+    """
+        Build a PT-only data structure from GoFEM phase tensor rows.
+
+        Returns a dictionary keyed by station with ``frequencies``,
+        ``PhaseTensor`` and ``PhT_err``. This is intentionally independent of
+        MTpy because phase tensors can be inverted without impedance tensors.
+    """
+
+    colnames = ["type", "frequency", "source", "station", "value", "std_error"]
+    if isinstance(measured_data, pd.DataFrame):
+        df = measured_data.copy()
+    else:
+        df = pd.DataFrame(measured_data, columns=colnames)
+
+    if not set(colnames).issubset(df.columns):
+        df = df.iloc[:, : len(colnames)]
+        df.columns = colnames
+
+    df = df[df["type"].isin(["PTxx", "PTxy", "PTyx", "PTyy"])].copy()
+    df["frequency"] = df["frequency"].astype(float)
+    df["value"] = df["value"].astype(float)
+    df["std_error"] = df["std_error"].astype(float)
+
+    all_frequencies = np.sort(df["frequency"].unique())
+    receiver_names = np.asarray(receiver_names)
+
+    data_dict = {}
+    component_index = {
+        "PTxx": (0, 0),
+        "PTxy": (0, 1),
+        "PTyx": (1, 0),
+        "PTyy": (1, 1),
+    }
+
+    for station in receiver_names:
+        phase_tensor = np.full((len(all_frequencies), 2, 2), np.nan)
+        phase_tensor_error = np.full((len(all_frequencies), 2, 2), np.nan)
+
+        if fill_missing:
+            phase_tensor[:] = 0.0
+            phase_tensor_error[:] = 1.0
+
+        station_df = df[df["station"] == station]
+        for fidx, frequency in enumerate(all_frequencies):
+            freq_df = station_df[station_df["frequency"] == frequency]
+            for data_type, (i, j) in component_index.items():
+                rows = freq_df[freq_df["type"] == data_type]
+                if rows.empty:
+                    continue
+
+                phase_tensor[fidx, i, j] = rows.iloc[0]["value"]
+                phase_tensor_error[fidx, i, j] = rows.iloc[0]["std_error"]
+
+        station_data = {
+            "frequencies": all_frequencies,
+            "PhaseTensor": phase_tensor,
+            "PhT_err": phase_tensor_error,
+        }
+        data_dict[station] = station_data
+
+    return data_dict
+
+
+def read_gofem_phase_tensor_inversion_output(data_file, fill_missing=False):
+    """
+        Read GoFEM inversion data containing PTxx/PTxy/PTyx/PTyy rows.
+
+        Returns a PT-only data dictionary and the sorted frequency array.
+    """
+
+    colnames = ["type", "frequency", "source", "station", "value", "std_error"]
+    df = pd.read_csv(data_file, sep=r"\s+", header=None, names=colnames, comment="#")
+    df_pt = df[df["type"].isin(["PTxx", "PTxy", "PTyx", "PTyy"])].copy()
+
+    if df_pt.empty:
+        raise Exception("No phase tensor data found in %s." % data_file)
+
+    data_dict = phase_tensor_data_structure(
+        df_pt["station"].unique(),
+        df_pt,
+        fill_missing=fill_missing,
+    )
+
+    return data_dict, np.sort(df_pt["frequency"].astype(float).unique())
+
+
 def calculate_rms_Z(mt_obs_list, mt_mod_list, ftol = 0.03):
     
     frequencies_mod = np.array([])
@@ -517,3 +605,117 @@ def calculate_rms_T(mt_obs_list, mt_mod_list, ftol = 0.03):
     rmse_total = np.sqrt(mse_total / np.sum(n_data_per_period))
     
     return rmse_total, rmse_per_station, rmse_per_period, 1./ frequencies_mod, stn_obs_codes, normalized_residuals
+
+
+def calculate_rms_PT(pt_obs_dict, pt_mod_dict, ftol=0.03):
+    """
+        Calculate RMS misfit for PT-only data dictionaries.
+
+        The input dictionaries are expected to be keyed by station and contain
+        ``frequencies``, ``PhaseTensor`` and ``PhT_err`` arrays, as returned by
+        ``phase_tensor_data_structure`` or
+        ``read_gofem_phase_tensor_inversion_output``.
+    """
+
+    frequencies_mod = np.array([])
+    for station in pt_mod_dict:
+        for frequency in pt_mod_dict[station]["frequencies"]:
+            freq_max = frequency * (1 + ftol)
+            freq_min = frequency * (1 - ftol)
+
+            fidx = np.where((frequencies_mod < freq_max) & (frequencies_mod > freq_min))[0]
+
+            if np.size(fidx) == 0:
+                frequencies_mod = np.append(frequencies_mod, frequency)
+
+    frequencies_mod = np.sort(frequencies_mod)
+    stn_obs_codes = np.array([station for station in pt_obs_dict.keys()])
+
+    mse_per_period = np.zeros(shape=(len(frequencies_mod),))
+    mse_per_station = np.zeros(shape=(len(stn_obs_codes),))
+    mse_total = 0.0
+
+    n_data_per_period = np.zeros(shape=(len(frequencies_mod),))
+    n_data_per_station = np.zeros(shape=(len(stn_obs_codes),))
+
+    normalized_residuals = np.empty(shape=(0,))
+
+    for station in pt_mod_dict:
+        sidx = np.where(stn_obs_codes == station)[0]
+
+        if np.size(sidx) == 0:
+            raise Exception(
+                "Your modelled phase tensor data contains station "
+                + station
+                + " which is not in the observed response file."
+            )
+        else:
+            sidx = sidx[0]
+
+        pt_obj_modelled = pt_mod_dict[station]
+        pt_obj_observed = pt_obs_dict[station]
+
+        station_mod_freqs = np.asarray(pt_obj_modelled["frequencies"], dtype=float)
+        station_obs_freqs = np.asarray(pt_obj_observed["frequencies"], dtype=float)
+
+        phase_tensor_obs = np.asarray(pt_obj_observed["PhaseTensor"], dtype=float)
+        phase_tensor_err = np.asarray(pt_obj_observed["PhT_err"], dtype=float)
+        phase_tensor_mod = np.asarray(pt_obj_modelled["PhaseTensor"], dtype=float)
+
+        for pidx, frequency in enumerate(frequencies_mod):
+            freq_max = frequency * (1 + ftol)
+            freq_min = frequency * (1 - ftol)
+
+            fidx_obs = np.where((station_obs_freqs < freq_max) & (station_obs_freqs > freq_min))[0]
+
+            if np.size(fidx_obs) == 0:
+                raise Exception(
+                    "Your observed phase tensor data contains frequency %f "
+                    "which is not in the modelled response file or vice versa." % frequency
+                )
+            else:
+                fidx_obs = fidx_obs[0]
+
+            fidx_mod = np.where((station_mod_freqs < freq_max) & (station_mod_freqs > freq_min))[0]
+
+            if np.size(fidx_mod) == 0:
+                raise Exception("This should not happen...")
+            else:
+                fidx_mod = fidx_mod[0]
+
+            PT_obs = phase_tensor_obs[fidx_obs]
+            PT_err = phase_tensor_err[fidx_obs]
+            PT_mod = phase_tensor_mod[fidx_mod]
+
+            if np.all(PT_obs == 0):
+                continue
+
+            valid = (
+                np.isfinite(PT_obs)
+                & np.isfinite(PT_mod)
+                & np.isfinite(PT_err)
+                & (PT_err > 0.0)
+            )
+
+            if not np.any(valid):
+                continue
+
+            residual = np.divide(PT_obs[valid] - PT_mod[valid], PT_err[valid])
+            mse = np.sum(residual ** 2)
+            n_data = residual.size
+
+            n_data_per_period[pidx] += n_data
+            n_data_per_station[sidx] += n_data
+
+            mse_per_period[pidx] += mse
+            mse_per_station[sidx] += mse
+            mse_total += mse
+
+            normalized_residuals = np.r_[normalized_residuals, residual]
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rmse_per_period = np.sqrt(np.divide(mse_per_period, n_data_per_period))
+        rmse_per_station = np.sqrt(np.divide(mse_per_station, n_data_per_station))
+        rmse_total = np.sqrt(mse_total / np.sum(n_data_per_period))
+
+    return rmse_total, rmse_per_station, rmse_per_period, 1.0 / frequencies_mod, stn_obs_codes, normalized_residuals
