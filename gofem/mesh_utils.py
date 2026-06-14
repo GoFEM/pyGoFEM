@@ -219,7 +219,7 @@ def refine_at_interface(triangulation, material_ids, repeat = 1, center = None, 
             for n, face in enumerate(cell.faces()):
                 if not face.at_boundary():
                     neighbor = cell.neighbor(n)
-                    if not neighbor.material_id in material_ids:
+                    if neighbor.material_id != cell.material_id:
                         cell.refine_flag = refine_flag
                             
         triangulation.execute_coarsening_and_refinement()
