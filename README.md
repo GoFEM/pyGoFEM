@@ -8,6 +8,12 @@ It invokes [MTPy-v2](https://mtpy-v2.readthedocs.io/en/latest/index.html) for ha
 
 To generate and work with **GoFEM** mesh and model files, we use the [Python interface](https://github.com/dealii/dealii/blob/master/contrib/python-bindings/notebooks/tutorial-1.ipynb) of the [deal.II](https://www.dealii.org/) library. It is available in deal.II since version 9.2, see the [Release](https://www.degruyter.com/document/doi/10.1515/jnma-2020-0043/html) co-authored by me.
 
+# MT Impedance Helper
+
+`gofem.data_utils.calculate_MT_impedance()` supports Cartesian and spherical field-component conventions through its `coordinate_system` argument.
+
+Use `coordinate_system='cartesian'` when the input field components are already local `X, Y, Z`. Use `coordinate_system='spherical'` when the input field components are ordered as `phi, theta, r`; in that case the local MT components are formed as `X = -theta`, `Y = phi`, and `Z = -r`. The default is `spherical` to preserve the historical behavior of pyGoFEM.
+
 # Contributing
 
 If you implement some functions that you think may be of general use, please feel free to create a [Pull Request](https://docs.github.com/en/github/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests) and contribute your code. 

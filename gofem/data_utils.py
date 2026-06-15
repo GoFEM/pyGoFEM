@@ -37,7 +37,33 @@ def read_modeling_responses_bin(file_format, frequencies):
             
     return coords, E, H, Ep, Hp, weights
 
-def calculate_MT_impedance(E1, H1, E2, H2, omega):
+def calculate_MT_impedance(E1, H1, E2, H2, omega, coordinate_system='spherical'):
+    """
+        Calculate MT impedance, apparent resistivity, and phase from electric
+        and magnetic fields for two source polarizations.
+
+        Parameters
+        ----------
+        E1, H1, E2, H2 : array-like
+            Complex electric and magnetic fields for the two source
+            polarizations. The last dimension is expected to contain the
+            three field components.
+        omega : float
+            Angular frequency.
+        coordinate_system : {'spherical', 'cartesian'}, optional
+            Horizontal field convention used by the input arrays. Use
+            'cartesian' when the first two components are already local
+            X and Y components. Use 'spherical' when the field components
+            are ordered as phi, theta, r. In this convention, local MT
+            components are calculated as X = -theta, Y = phi, and Z = -r.
+            The default preserves the historical behavior.
+
+        Returns
+        -------
+        Z, rho_app, phase : ndarray
+            Impedance tensor components, apparent resistivity, and phase.
+            Components are ordered as Zxx, Zxy, Zyx, Zyy.
+    """
     
     mu0 = 4*np.pi*1e-7
     Z = np.zeros(shape=(E1.shape[0], 4), dtype=np.complex128)
@@ -45,16 +71,31 @@ def calculate_MT_impedance(E1, H1, E2, H2, omega):
     H_i = np.zeros(shape=(2,2), dtype = np.complex128)
     E_i = np.zeros(shape=(2,2), dtype = np.complex128)
 
+    coordinate_system = coordinate_system.lower()
+    if coordinate_system not in ('spherical', 'cartesian'):
+        raise ValueError("coordinate_system must be either 'spherical' or 'cartesian'")
+
     for i in range(E1.shape[0]):
-        H_i[0,0] = -H1[i,1]
-        H_i[0,1] = -H2[i,1]
-        H_i[1,0] = H1[i,0]
-        H_i[1,1] = H2[i,0]
-        
-        E_i[0,0] = -E1[i,1]
-        E_i[0,1] = -E2[i,1]
-        E_i[1,0] = E1[i,0]
-        E_i[1,1] = E2[i,0]
+        if coordinate_system == 'spherical':
+            H_i[0,0] = -H1[i,1]
+            H_i[0,1] = -H2[i,1]
+            H_i[1,0] = H1[i,0]
+            H_i[1,1] = H2[i,0]
+
+            E_i[0,0] = -E1[i,1]
+            E_i[0,1] = -E2[i,1]
+            E_i[1,0] = E1[i,0]
+            E_i[1,1] = E2[i,0]
+        else:
+            H_i[0,0] = H1[i,0]
+            H_i[0,1] = H2[i,0]
+            H_i[1,0] = H1[i,1]
+            H_i[1,1] = H2[i,1]
+
+            E_i[0,0] = E1[i,0]
+            E_i[0,1] = E2[i,0]
+            E_i[1,0] = E1[i,1]
+            E_i[1,1] = E2[i,1]
 
         Z_i = np.matmul(E_i, np.linalg.inv(H_i))
 
